@@ -85,12 +85,14 @@ function FurnitureModel({ type, selected }: { type: FurnitureType; selected: boo
 export function Furniture() {
   const furniture = useWarehouseStore((s) => s.furniture);
   const updateFurniture = useWarehouseStore((s) => s.updateFurniture);
-  const selectedItem = useWarehouseStore((s) => s.selectedItem);
+  const selectedItems = useWarehouseStore((s) => s.selectedItems);
 
   return (
     <group>
       {furniture.map((f) => {
-        const isSelected = selectedItem?.type === 'furniture' && selectedItem.id === f.id;
+        const isSelected = selectedItems.some(
+          (it) => it.type === 'furniture' && it.id === f.id
+        );
         return (
           <EditableObject
             key={f.id}

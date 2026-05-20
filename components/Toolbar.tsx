@@ -18,17 +18,19 @@ export function Toolbar() {
   const addFurniture = useWarehouseStore((s) => s.addFurniture);
   const transformMode = useWarehouseStore((s) => s.transformMode);
   const setTransformMode = useWarehouseStore((s) => s.setTransformMode);
-  const selectedItem = useWarehouseStore((s) => s.selectedItem);
+  const selectedItems = useWarehouseStore((s) => s.selectedItems);
 
   const [w, setW] = useState(warehouseSize.width);
   const [d, setD] = useState(warehouseSize.depth);
 
   const applySize = () => setWarehouseSize(Number(w) || 0, Number(d) || 0);
 
+  const onlyItem = selectedItems.length === 1 ? selectedItems[0] : null;
   const showTransformModes =
-    selectedItem?.type === 'wall' ||
-    selectedItem?.type === 'furniture' ||
-    selectedItem?.type === 'shelf';
+    !!onlyItem &&
+    (onlyItem.type === 'wall' ||
+      onlyItem.type === 'furniture' ||
+      onlyItem.type === 'shelf');
 
   return (
     <div className="glass pointer-events-auto absolute left-5 top-28 z-10 w-[260px] rounded-2xl p-4">

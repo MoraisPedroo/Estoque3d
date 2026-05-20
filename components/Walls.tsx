@@ -6,12 +6,14 @@ import { EditableObject } from './EditableObject';
 export function Walls() {
   const walls = useWarehouseStore((s) => s.walls);
   const updateWall = useWarehouseStore((s) => s.updateWall);
-  const selectedItem = useWarehouseStore((s) => s.selectedItem);
+  const selectedItems = useWarehouseStore((s) => s.selectedItems);
 
   return (
     <group>
       {walls.map((w) => {
-        const isSelected = selectedItem?.type === 'wall' && selectedItem.id === w.id;
+        const isSelected = selectedItems.some(
+          (it) => it.type === 'wall' && it.id === w.id
+        );
         return (
           <EditableObject
             key={w.id}

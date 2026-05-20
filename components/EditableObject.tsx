@@ -36,11 +36,14 @@ export function EditableObject({
   const groupRef = useRef<THREE.Group>(null!);
   const [ready, setReady] = useState(false);
 
-  const selectedItem = useWarehouseStore((s) => s.selectedItem);
+  const selectedItems = useWarehouseStore((s) => s.selectedItems);
   const transformMode = useWarehouseStore((s) => s.transformMode);
   const selectItem = useWarehouseStore((s) => s.selectItem);
+  const toggleSelection = useWarehouseStore((s) => s.toggleSelection);
 
-  const isSelected = selectedItem?.id === id && selectedItem?.type === type;
+  const isInSelection = selectedItems.some((it) => it.id === id && it.type === type);
+  // Gizmo only when exactly one matching item is selected (avoids ambiguous multi-drag).
+  const showGizmo = isInSelection && selectedItems.length === 1;
 
   useEffect(() => {
     setReady(true);
@@ -75,7 +78,9 @@ export function EditableObject({
         ref={groupRef}
         onClick={(e) => {
           e.stopPropagation();
-          selectItem({ id, type });
+          const shift = (e.nativeEvent as MouseEvent).shiftKey;
+          if (shift) toggleSelection({ id, type });
+          else selectItem({ id, type });
         }}
         onPointerOver={(e) => {
           e.stopPropagation();
@@ -88,7 +93,7 @@ export function EditableObject({
       >
         {children}
       </group>
-      {ready && isSelected && (
+      {ready && showGizmo && (
         <TransformControls
           object={groupRef.current}
           mode={transformMode}

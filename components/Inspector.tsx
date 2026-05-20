@@ -1,45 +1,59 @@
 'use client';
 
+import { useState } from 'react';
 import { useWarehouseStore } from '@/store/useWarehouseStore';
-import { MODEL_LABELS, ItemType } from '@/lib/data';
+import {
+  COLOR_PALETTE,
+  DEPTH_LAYER_OPTIONS,
+  ItemType,
+  MODEL_COLORS,
+  MODEL_LABELS,
+  PrinterModel,
+  SelectedItem,
+} from '@/lib/data';
 
 export function Inspector() {
-  const selectedItem = useWarehouseStore((s) => s.selectedItem);
-  const removeItem = useWarehouseStore((s) => s.removeItem);
+  const selectedItems = useWarehouseStore((s) => s.selectedItems);
 
-  if (!selectedItem) return null;
+  if (selectedItems.length === 0) return null;
 
+  // Multi-selection: bulk panel (currently for boxes; others fall back to first item)
+  if (selectedItems.length > 1) {
+    const allBoxes = selectedItems.every((it) => it.type === 'box');
+    if (allBoxes) {
+      return (
+        <div className="glass pointer-events-auto absolute right-5 top-28 z-10 w-[320px] rounded-2xl p-4">
+          <BulkBoxInspector ids={selectedItems.map((i) => i.id)} />
+        </div>
+      );
+    }
+  }
+
+  const first = selectedItems[0];
   return (
     <div className="glass pointer-events-auto absolute right-5 top-28 z-10 w-[320px] rounded-2xl p-4">
-      <div className="flex items-center justify-between">
-        <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Propriedades</div>
-        <RemoveButton id={selectedItem.id} type={selectedItem.type} onRemove={removeItem} />
-      </div>
-      {selectedItem.type === 'box' && <BoxInspector id={selectedItem.id} />}
-      {selectedItem.type === 'shelf' && <ShelfInspector id={selectedItem.id} />}
-      {selectedItem.type === 'wall' && <WallInspector id={selectedItem.id} />}
-      {selectedItem.type === 'furniture' && <FurnitureInspector id={selectedItem.id} />}
+      <SinglePanelHeader item={first} />
+      {first.type === 'box' && <BoxInspector id={first.id} />}
+      {first.type === 'shelf' && <ShelfInspector id={first.id} />}
+      {first.type === 'wall' && <WallInspector id={first.id} />}
+      {first.type === 'furniture' && <FurnitureInspector id={first.id} />}
     </div>
   );
 }
 
-function RemoveButton({
-  id,
-  type,
-  onRemove,
-}: {
-  id: string;
-  type: ItemType;
-  onRemove: (id: string, type: ItemType) => void;
-}) {
+function SinglePanelHeader({ item }: { item: SelectedItem }) {
+  const removeItem = useWarehouseStore((s) => s.removeItem);
   return (
-    <button
-      onClick={() => onRemove(id, type)}
-      title="Remover item"
-      className="rounded-md border border-red-500/40 bg-red-500/10 px-2 py-1 text-xs text-red-300 transition hover:bg-red-500/20"
-    >
-      🗑 Remover
-    </button>
+    <div className="flex items-center justify-between">
+      <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Propriedades</div>
+      <button
+        onClick={() => removeItem(item.id, item.type)}
+        title="Remover item"
+        className="rounded-md border border-red-500/40 bg-red-500/10 px-2 py-1 text-xs text-red-300 transition hover:bg-red-500/20"
+      >
+        🗑 Remover
+      </button>
+    </div>
   );
 }
 
@@ -74,6 +88,7 @@ function NumberInput({
   );
 }
 
+// ===== Single Box =====
 function BoxInspector({ id }: { id: string }) {
   const box = useWarehouseStore((s) => s.boxes.find((b) => b.id === id));
   const updateBox = useWarehouseStore((s) => s.updateBox);
@@ -98,6 +113,10 @@ function BoxInspector({ id }: { id: string }) {
         <div className="text-xs text-slate-400">
           {MODEL_LABELS[box.model]} • SKU {box.sku}
         </div>
+        <div className="text-[10px] text-slate-500">
+          Camada {box.layerIndex + 1} • Fileira {box.rowIndex + 1} • Coluna{' '}
+          {box.colIndex + 1}
+        </div>
       </div>
 
       <label className="block text-[11px] text-slate-400">
@@ -116,6 +135,26 @@ function BoxInspector({ id }: { id: string }) {
             className="flex-1 rounded-md border border-slate-700 bg-slate-900/60 px-2 py-1.5 text-sm text-slate-100"
           />
         </div>
+      </label>
+
+      <label className="block text-[11px] text-slate-400">
+        Tipo de Impressora
+        <select
+          value={box.model}
+          onChange={(e) =>
+            updateBox(box.id, {
+              model: e.target.value as PrinterModel,
+              color: MODEL_COLORS[e.target.value as PrinterModel],
+            })
+          }
+          className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900/60 px-2 py-1.5 text-sm text-slate-100"
+        >
+          {(Object.keys(MODEL_LABELS) as PrinterModel[]).map((m) => (
+            <option key={m} value={m}>
+              {MODEL_LABELS[m]}
+            </option>
+          ))}
+        </select>
       </label>
 
       <div>
@@ -139,6 +178,127 @@ function BoxInspector({ id }: { id: string }) {
   );
 }
 
+// ===== Bulk Box =====
+function BulkBoxInspector({ ids }: { ids: string[] }) {
+  const bulkUpdateBoxes = useWarehouseStore((s) => s.bulkUpdateBoxes);
+  const clearSelection = useWarehouseStore((s) => s.clearSelection);
+  const removeSelectedItems = useWarehouseStore((s) => s.removeSelectedItems);
+
+  const [color, setColor] = useState('#60a5fa');
+  const [model, setModel] = useState<PrinterModel>('laser');
+  const [w, setW] = useState(0.9);
+  const [h, setH] = useState(0.55);
+  const [d, setD] = useState(0.7);
+
+  const applyColor = (c: string) => {
+    setColor(c);
+    bulkUpdateBoxes(ids, { color: c });
+  };
+  const applyModel = (m: PrinterModel) => {
+    setModel(m);
+    bulkUpdateBoxes(ids, { model: m, color: MODEL_COLORS[m] });
+    setColor(MODEL_COLORS[m]);
+  };
+  const applySize = () => {
+    bulkUpdateBoxes(ids, {
+      size: [Math.max(0.05, w), Math.max(0.05, h), Math.max(0.05, d)],
+    });
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
+            Edição em Massa
+          </div>
+          <div className="text-base font-semibold text-slate-100">
+            {ids.length} caixas selecionadas
+          </div>
+        </div>
+        <button
+          onClick={removeSelectedItems}
+          title="Remover todas"
+          className="rounded-md border border-red-500/40 bg-red-500/10 px-2 py-1 text-xs text-red-300 transition hover:bg-red-500/20"
+        >
+          🗑
+        </button>
+      </div>
+
+      <div>
+        <div className="mb-1 text-[11px] uppercase text-slate-500">Paleta de Cores</div>
+        <div className="grid grid-cols-5 gap-1.5">
+          {COLOR_PALETTE.map((c) => (
+            <button
+              key={c}
+              onClick={() => applyColor(c)}
+              className={`h-8 w-full rounded-md border transition ${
+                color === c
+                  ? 'border-white scale-105'
+                  : 'border-slate-700 hover:border-slate-500'
+              }`}
+              style={{ backgroundColor: c }}
+              title={c}
+            />
+          ))}
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            type="color"
+            value={color}
+            onChange={(e) => applyColor(e.target.value)}
+            className="h-8 w-14 cursor-pointer rounded border border-slate-700 bg-transparent"
+          />
+          <span className="text-xs text-slate-400">Cor customizada</span>
+        </div>
+      </div>
+
+      <label className="block text-[11px] text-slate-400">
+        Tipo de Impressora
+        <select
+          value={model}
+          onChange={(e) => applyModel(e.target.value as PrinterModel)}
+          className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900/60 px-2 py-1.5 text-sm text-slate-100"
+        >
+          {(Object.keys(MODEL_LABELS) as PrinterModel[]).map((m) => (
+            <option key={m} value={m}>
+              {MODEL_LABELS[m]}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div>
+        <div className="mb-1 text-[11px] uppercase text-slate-500">Tamanho (m)</div>
+        <div className="grid grid-cols-3 gap-2">
+          <NumberInput label="L" value={w} onChange={setW} />
+          <NumberInput label="A" value={h} onChange={setH} />
+          <NumberInput label="P" value={d} onChange={setD} />
+        </div>
+        <button
+          onClick={applySize}
+          className="mt-2 w-full rounded-md bg-sky-500/90 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-sky-400"
+        >
+          Aplicar tamanho em todas
+        </button>
+      </div>
+
+      <button
+        onClick={clearSelection}
+        className="w-full rounded-md border border-slate-700/70 bg-slate-800/60 px-3 py-1.5 text-xs text-slate-200 transition hover:bg-slate-700/70"
+      >
+        Limpar seleção
+      </button>
+
+      <p className="text-[10px] text-slate-500">
+        Dica: segure <kbd className="rounded bg-slate-800 px-1">Shift</kbd> + clique para
+        adicionar/remover caixas da seleção.
+      </p>
+    </div>
+  );
+}
+
+// ===== Shelf =====
 function ShelfInspector({ id }: { id: string }) {
   const shelf = useWarehouseStore((s) => s.shelves.find((sh) => sh.id === id));
   const updateShelf = useWarehouseStore((s) => s.updateShelf);
@@ -164,7 +324,8 @@ function ShelfInspector({ id }: { id: string }) {
         <div>
           <div className="text-base font-semibold text-slate-100">Estante {shelf.label}</div>
           <div className="text-xs text-slate-400">
-            {shelf.rows} fileiras × {shelf.columns} colunas
+            {shelf.depthLayers} camada{shelf.depthLayers > 1 ? 's' : ''} • {shelf.rows}×
+            {shelf.columns} = {shelf.capacityPerLayer} slots/camada
           </div>
         </div>
         {view === 'floor' && (
@@ -176,6 +337,21 @@ function ShelfInspector({ id }: { id: string }) {
           </button>
         )}
       </div>
+
+      <label className="block text-[11px] text-slate-400">
+        Layout da Estante (profundidade)
+        <select
+          value={shelf.depthLayers}
+          onChange={(e) => updateShelf(shelf.id, { depthLayers: Number(e.target.value) })}
+          className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900/60 px-2 py-1.5 text-sm text-slate-100"
+        >
+          {DEPTH_LAYER_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <div>
         <div className="mb-1 text-[11px] uppercase text-slate-500">Estrutura</div>
@@ -198,7 +374,7 @@ function ShelfInspector({ id }: { id: string }) {
           />
         </div>
         <p className="mt-1 text-[10px] text-slate-500">
-          Alterar fileiras/colunas recria o buffer de caixas desta estante.
+          Alterar fileiras/colunas/camadas recria o buffer de caixas desta estante.
         </p>
       </div>
 
@@ -235,6 +411,7 @@ function ShelfInspector({ id }: { id: string }) {
   );
 }
 
+// ===== Wall =====
 function WallInspector({ id }: { id: string }) {
   const wall = useWarehouseStore((s) => s.walls.find((w) => w.id === id));
   const updateWall = useWarehouseStore((s) => s.updateWall);
@@ -308,6 +485,7 @@ function WallInspector({ id }: { id: string }) {
   );
 }
 
+// ===== Furniture =====
 function FurnitureInspector({ id }: { id: string }) {
   const f = useWarehouseStore((s) => s.furniture.find((x) => x.id === id));
   const updateFurniture = useWarehouseStore((s) => s.updateFurniture);

@@ -15,10 +15,8 @@ import {
 import { useWarehouseStore } from '@/store/useWarehouseStore';
 import { cameraRef } from '@/lib/cameraRef';
 
-const matrix = new THREE.Matrix4();
-const quat = new THREE.Quaternion();
-const posV = new THREE.Vector3();
-const sclV = new THREE.Vector3();
+// Reusable matrix helpers (mutated each frame — no allocation hotspots)
+const dummy = new THREE.Object3D();
 const color = new THREE.Color();
 const HIGHLIGHT = new THREE.Color('#ffffff');
 
@@ -33,12 +31,13 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
   const view = useWarehouseStore((s) => s.view);
   const selectedShelfId = useWarehouseStore((s) => s.selectedShelfId);
   const selectedRow = useWarehouseStore((s) => s.selectedRow);
-  const selectedItem = useWarehouseStore((s) => s.selectedItem);
+  const selectedItems = useWarehouseStore((s) => s.selectedItems);
   const hoveredBoxId = useWarehouseStore((s) => s.hoveredBoxId);
   const transformMode = useWarehouseStore((s) => s.transformMode);
 
   const zoomToShelf = useWarehouseStore((s) => s.zoomToShelf);
   const selectItem = useWarehouseStore((s) => s.selectItem);
+  const toggleSelection = useWarehouseStore((s) => s.toggleSelection);
   const setHoveredBoxId = useWarehouseStore((s) => s.setHoveredBoxId);
   const updateShelf = useWarehouseStore((s) => s.updateShelf);
 
@@ -46,29 +45,33 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
     s.boxes.filter((b) => b.shelfId === shelf.id)
   );
 
-  const isSelected =
-    selectedItem?.type === 'shelf' && selectedItem.id === shelf.id;
+  const isShelfSelected = selectedItems.some(
+    (it) => it.type === 'shelf' && it.id === shelf.id
+  );
+  const onlyShelfSelected = isShelfSelected && selectedItems.length === 1;
   const isFocused = selectedShelfId === shelf.id && view === 'rack';
-  const showGizmo = isSelected && view === 'floor';
+  const showGizmo = onlyShelfSelected && view === 'floor';
+
+  // Set of currently selected box ids (for color highlight)
+  const selectedBoxIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const it of selectedItems) if (it.type === 'box') s.add(it.id);
+    return s;
+  }, [selectedItems]);
 
   const rackWidth = rackWidthOf(shelf);
   const rackHeight = rackHeightOf(shelf);
   const rackDepth = rackDepthOf(shelf);
 
-  const [bw, bh, bd] = shelf.boxSize;
-
-  const geometry = useMemo(() => {
-    const radius = Math.min(bw, bh, bd) * 0.08;
-    return new RoundedBoxGeometry(bw, bh, bd, 3, radius);
-  }, [bw, bh, bd]);
-
+  // Unit geometry — per-instance dummy.scale encodes the real box size.
+  const geometry = useMemo(() => new RoundedBoxGeometry(1, 1, 1, 3, 0.06), []);
   useEffect(() => () => geometry.dispose(), [geometry]);
 
   useEffect(() => {
     setGroupReady(true);
   }, []);
 
-  // Sync group from store (when inspector edits numerically or position/rotation changes externally)
+  // Sync group transform from store (numeric edits / regen / external update)
   useEffect(() => {
     const g = groupRef.current;
     if (!g) return;
@@ -76,24 +79,24 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
     g.rotation.set(...shelf.rotation);
   }, [shelf.position, shelf.rotation]);
 
-  // Write matrices when boxes change
+  // Matrices: write scale + position per instance via dummy
   useEffect(() => {
     const mesh = meshRef.current;
     if (!mesh) return;
-    quat.identity();
     for (let i = 0; i < boxes.length; i++) {
       const b = boxes[i];
-      posV.set(b.position[0], b.position[1], b.position[2]);
-      sclV.set(b.size[0] / bw, b.size[1] / bh, b.size[2] / bd);
-      matrix.compose(posV, quat, sclV);
-      mesh.setMatrixAt(i, matrix);
+      dummy.position.set(b.position[0], b.position[1], b.position[2]);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(b.size[0], b.size[1], b.size[2]);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
     }
     mesh.count = boxes.length;
     mesh.instanceMatrix.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [boxes, bw, bh, bd]);
+  }, [boxes]);
 
-  // Write colors on hover / selection / row focus
+  // Colors: hover / selection (single + multi) / row focus
   useEffect(() => {
     const mesh = meshRef.current;
     if (!mesh) return;
@@ -103,10 +106,11 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
       color.set(b.color);
 
       const isBoxHover = hoveredBoxId === b.id;
-      const isBoxSelected =
-        selectedItem?.type === 'box' && selectedItem.id === b.id;
-      const rowFocused = isFocused && selectedRow !== null && b.rowIndex === selectedRow;
-      const rowDimmed = isFocused && selectedRow !== null && b.rowIndex !== selectedRow;
+      const isBoxSelected = selectedBoxIds.has(b.id);
+      const rowFocused =
+        isFocused && selectedRow !== null && b.rowIndex === selectedRow;
+      const rowDimmed =
+        isFocused && selectedRow !== null && b.rowIndex !== selectedRow;
 
       if (rowDimmed) color.multiplyScalar(0.35);
 
@@ -117,8 +121,9 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
       mesh.setColorAt(i, color);
     }
 
+    // Imperative signal to the GPU — buffer is dirty.
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }, [boxes, hoveredBoxId, selectedItem, isFocused, selectedRow]);
+  }, [boxes, hoveredBoxId, selectedBoxIds, isFocused, selectedRow]);
 
   // ---- Pointer handlers ----
 
@@ -141,12 +146,17 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
     if (e.instanceId == null) return;
     e.stopPropagation();
     const b = boxes[e.instanceId];
-    if (b) selectItem({ id: b.id, type: 'box' });
+    if (!b) return;
+    const shift = (e.nativeEvent as MouseEvent).shiftKey;
+    if (shift) toggleSelection({ id: b.id, type: 'box' });
+    else selectItem({ id: b.id, type: 'box' });
   };
 
   const handleShelfClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
-    selectItem({ id: shelf.id, type: 'shelf' });
+    const shift = (e.nativeEvent as MouseEvent).shiftKey;
+    if (shift) toggleSelection({ id: shelf.id, type: 'shelf' });
+    else selectItem({ id: shelf.id, type: 'shelf' });
   };
 
   const handleShelfDoubleClick = (e: ThreeEvent<MouseEvent>) => {
@@ -192,14 +202,14 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
             height={rackHeight}
             depth={rackDepth}
             rows={shelf.rows}
-            boxHeight={bh}
-            highlighted={isSelected || isFocused}
+            boxHeight={shelf.boxSize[1]}
+            highlighted={isShelfSelected || isFocused}
           />
         </group>
 
         <Bvh firstHitOnly>
           <instancedMesh
-            key={`${shelf.id}-${boxes.length}-${bw.toFixed(3)}-${bh.toFixed(3)}-${bd.toFixed(3)}`}
+            key={`${shelf.id}-${boxes.length}`}
             ref={meshRef}
             args={[geometry, undefined, Math.max(boxes.length, 1)]}
             castShadow
@@ -215,7 +225,7 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
         <Text
           position={[0, rackHeight + 0.15, 0]}
           fontSize={0.32}
-          color={isSelected || isFocused ? '#38bdf8' : '#94a3b8'}
+          color={isShelfSelected || isFocused ? '#38bdf8' : '#94a3b8'}
           anchorX="center"
           anchorY="middle"
         >
