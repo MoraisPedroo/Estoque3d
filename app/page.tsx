@@ -1,10 +1,12 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { InfoPanel } from '@/components/InfoPanel';
 import { TopBar } from '@/components/TopBar';
+import { Toolbar } from '@/components/Toolbar';
+import { Inspector } from '@/components/Inspector';
+import { InfoPanel } from '@/components/InfoPanel';
 
-const Scene = dynamic(() => import('@/components/Scene').then(m => m.Scene), {
+const Scene = dynamic(() => import('@/components/Scene').then((m) => m.Scene), {
   ssr: false,
   loading: () => (
     <div className="absolute inset-0 grid place-items-center text-slate-300">
@@ -21,6 +23,8 @@ export default function Page() {
     <main className="relative h-screen w-screen overflow-hidden bg-[#0b0f17]">
       <Scene />
       <TopBar />
+      <Toolbar />
+      <Inspector />
       <InfoPanel />
     </main>
   );

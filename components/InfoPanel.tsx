@@ -1,24 +1,27 @@
 'use client';
 
 import { useWarehouseStore } from '@/store/useWarehouseStore';
-import { MODEL_COLORS, MODEL_LABELS, ROWS } from '@/lib/data';
+import { ROWS } from '@/lib/data';
 
 export function InfoPanel() {
   const view = useWarehouseStore((s) => s.view);
   const racks = useWarehouseStore((s) => s.racks);
+  const boxes = useWarehouseStore((s) => s.boxes);
   const selectedRackId = useWarehouseStore((s) => s.selectedRackId);
   const selectedRow = useWarehouseStore((s) => s.selectedRow);
-  const hoveredBox = useWarehouseStore((s) => s.hoveredBox);
   const selectRow = useWarehouseStore((s) => s.selectRow);
 
   if (view === 'floor') {
+    const filled = boxes.filter((b) => b.model !== 'vazio').length;
     return (
       <div className="pointer-events-none absolute bottom-5 left-5 z-10">
         <div className="glass rounded-2xl px-5 py-4">
           <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Planta Baixa</div>
           <div className="mt-1 text-sm text-slate-200">
-            {racks.length} estantes •{' '}
-            {racks.reduce((acc, r) => acc + r.slots.filter(Boolean).length, 0)} caixas em estoque
+            {racks.length} estantes • {filled} caixas em estoque
+          </div>
+          <div className="mt-0.5 text-xs text-slate-500">
+            Clique em uma estante para inspecionar
           </div>
         </div>
       </div>
@@ -28,21 +31,13 @@ export function InfoPanel() {
   const rack = racks.find((r) => r.id === selectedRackId);
   if (!rack) return null;
 
-  const totalSlots = rack.slots.length;
-  const filled = rack.slots.filter(Boolean).length;
-  const occupancy = Math.round((filled / totalSlots) * 100);
-
-  const hoverSlot =
-    hoveredBox && hoveredBox.rackId === rack.id ? rack.slots[hoveredBox.slotIndex] : null;
-  const hoverRow =
-    hoveredBox && hoveredBox.rackId === rack.id
-      ? Math.floor(hoveredBox.slotIndex / rack.columns)
-      : null;
-  const hoverCol =
-    hoveredBox && hoveredBox.rackId === rack.id ? (hoveredBox.slotIndex % rack.columns) + 1 : null;
+  const rackBoxes = boxes.filter((b) => b.rackId === rack.id);
+  const totalSlots = rackBoxes.length;
+  const filled = rackBoxes.filter((b) => b.model !== 'vazio').length;
+  const occupancy = totalSlots > 0 ? Math.round((filled / totalSlots) * 100) : 0;
 
   return (
-    <div className="pointer-events-auto absolute bottom-5 left-5 z-10 w-[320px]">
+    <div className="pointer-events-auto absolute bottom-5 left-5 z-10 w-[300px]">
       <div className="glass rounded-2xl p-5">
         <div className="flex items-baseline justify-between">
           <div>
@@ -84,38 +79,8 @@ export function InfoPanel() {
           </div>
         </div>
 
-        <div className="mt-4 rounded-xl border border-slate-700/50 bg-slate-900/40 p-3">
-          {hoverSlot ? (
-            <>
-              <div className="flex items-center gap-2">
-                <span
-                  className="inline-block h-3 w-3 rounded-sm"
-                  style={{ backgroundColor: MODEL_COLORS[hoverSlot.model] }}
-                />
-                <span className="text-sm font-semibold text-slate-100">
-                  {MODEL_LABELS[hoverSlot.model]}
-                </span>
-              </div>
-              <div className="mt-1.5 text-xs text-slate-400">
-                SKU <span className="text-slate-200">{hoverSlot.sku}</span>
-                {hoverSlot.serial && (
-                  <>
-                    {' • '}
-                    Série <span className="text-slate-200">{hoverSlot.serial}</span>
-                  </>
-                )}
-              </div>
-              <div className="text-xs text-slate-400">
-                Posição: Fileira {(hoverRow ?? 0) + 1} · Coluna {hoverCol}
-              </div>
-            </>
-          ) : hoveredBox ? (
-            <div className="text-sm text-slate-400">Slot vazio</div>
-          ) : (
-            <div className="text-sm text-slate-500">
-              Passe o mouse sobre uma caixa para ver detalhes.
-            </div>
-          )}
+        <div className="mt-3 text-xs text-slate-500">
+          Clique numa caixa para abrir o inspetor de propriedades.
         </div>
       </div>
     </div>
