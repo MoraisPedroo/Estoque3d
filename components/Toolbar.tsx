@@ -16,6 +16,7 @@ export function Toolbar() {
   const setWarehouseSize = useWarehouseStore((s) => s.setWarehouseSize);
   const addShelf = useWarehouseStore((s) => s.addShelf);
   const addWall = useWarehouseStore((s) => s.addWall);
+  const addDoor = useWarehouseStore((s) => s.addDoor);
   const addFurniture = useWarehouseStore((s) => s.addFurniture);
   const transformMode = useWarehouseStore((s) => s.transformMode);
   const setTransformMode = useWarehouseStore((s) => s.setTransformMode);
@@ -84,6 +85,12 @@ export function Toolbar() {
           className="rounded-md border border-slate-700/70 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 transition hover:bg-slate-700/70"
         >
           + Divisória
+        </button>
+        <button
+          onClick={addDoor}
+          className="rounded-md border border-slate-700/70 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 transition hover:bg-slate-700/70"
+        >
+          + Porta
         </button>
         <FurnitureButton label="+ Mesa" onClick={() => addFurniture('desk')} />
         <FurnitureButton label="+ Cadeira" onClick={() => addFurniture('chair')} />

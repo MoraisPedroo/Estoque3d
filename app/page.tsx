@@ -7,6 +7,8 @@ import { Inspector } from '@/components/Inspector';
 import { InfoPanel } from '@/components/InfoPanel';
 import { BoxDetailsModal } from '@/components/BoxDetailsModal';
 import { DragBanner } from '@/components/DragBanner';
+import { RelocateBanner } from '@/components/RelocateBanner';
+import { ShelfGridModal } from '@/components/ShelfGridModal';
 
 const Scene = dynamic(() => import('@/components/Scene').then((m) => m.Scene), {
   ssr: false,
@@ -32,7 +34,9 @@ export default function Page() {
         <Inspector />
         <InfoPanel />
         <DragBanner />
+        <RelocateBanner />
         <BoxDetailsModal />
+        <ShelfGridModal />
       </div>
     </main>
   );

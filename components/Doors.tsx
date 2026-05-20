@@ -1,0 +1,57 @@
+'use client';
+
+import { useWarehouseStore } from '@/store/useWarehouseStore';
+import { EditableObject } from './EditableObject';
+
+export function Doors() {
+  const doors = useWarehouseStore((s) => s.doors);
+  const updateDoor = useWarehouseStore((s) => s.updateDoor);
+  const selectedItems = useWarehouseStore((s) => s.selectedItems);
+
+  return (
+    <group>
+      {doors.map((d) => {
+        const isSelected = selectedItems.some(
+          (it) => it.type === 'door' && it.id === d.id
+        );
+        return (
+          <EditableObject
+            key={d.id}
+            id={d.id}
+            type="door"
+            position={d.position}
+            rotation={d.rotation}
+            scale={d.scale}
+            // updateDoor internally re-snaps the door to the nearest wall, so the
+            // gizmo's free motion ends up locked to wall rotation + plane.
+            onCommit={(next) =>
+              updateDoor(d.id, {
+                position: next.position,
+                rotation: next.rotation,
+                scale: next.scale,
+              })
+            }
+          >
+            <group>
+              <mesh castShadow receiveShadow>
+                <boxGeometry args={[1, 1, 1]} />
+                <meshStandardMaterial
+                  color={d.color}
+                  roughness={0.5}
+                  metalness={0.15}
+                  emissive={isSelected ? '#0ea5e9' : '#000000'}
+                  emissiveIntensity={isSelected ? 0.18 : 0}
+                />
+              </mesh>
+              {/* Handle dot — a tiny ball on the door surface */}
+              <mesh position={[0.36, 0, 0.55]} castShadow>
+                <sphereGeometry args={[0.04, 12, 12]} />
+                <meshStandardMaterial color="#fcd34d" metalness={0.8} roughness={0.25} />
+              </mesh>
+            </group>
+          </EditableObject>
+        );
+      })}
+    </group>
+  );
+}

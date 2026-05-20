@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import {
   Box,
+  Door,
   Furniture,
   FurnitureType,
   ItemType,
+  MODEL_COLORS,
   SelectedItem,
   Shelf,
   TransformMode,
@@ -14,6 +16,7 @@ import {
   localBoxPosition,
   uid,
 } from '@/lib/data';
+import { snapDoorToWall } from '@/lib/snap';
 
 export type ViewMode = 'floor' | 'rack';
 export type AppMode = 'view' | 'edit';
@@ -25,6 +28,12 @@ interface WarehouseState {
   boxes: Box[];
   walls: Wall[];
   furniture: Furniture[];
+  doors: Door[];
+
+  /** Box currently in "relocate by clicking another slot" mode (view-mode flow). */
+  relocatingBoxId: string | null;
+  /** Shelf opened in 2D grid inspection mode. */
+  inspectingShelf: { id: string; layer: number | null } | null;
 
   view: ViewMode;
   selectedShelfId: string | null;
@@ -57,6 +66,16 @@ interface WarehouseState {
   addShelf: () => void;
   addWall: () => void;
   addFurniture: (type: FurnitureType) => void;
+  addDoor: () => void;
+  updateDoor: (id: string, patch: Partial<Door>) => void;
+
+  setRelocatingBox: (id: string | null) => void;
+  relocateToBox: (sourceId: string, destBoxId: string) => void;
+  clearBox: (id: string) => void;
+
+  openShelfInspection: (id: string, layer: number | null) => void;
+  setInspectionLayer: (layer: number) => void;
+  closeShelfInspection: () => void;
 
   removeItem: (id: string, type: ItemType) => void;
   removeSelectedItems: () => void;
@@ -82,6 +101,9 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
   boxes: initialBoxes,
   walls: [],
   furniture: [],
+  doors: [],
+  relocatingBoxId: null,
+  inspectingShelf: null,
 
   view: 'floor',
   selectedShelfId: null,
@@ -256,6 +278,105 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
     }));
   },
 
+  addDoor: () => {
+    const id = uid('door');
+    set((s) => {
+      const draft: Door = {
+        id,
+        position: [0, 1.05, 0],
+        rotation: [0, 0, 0],
+        scale: [1, 2.1, 0.06],
+        color: '#8b5a2b',
+        wallId: null,
+      };
+      // Try to snap to an existing wall immediately on creation.
+      const snapped = snapDoorToWall(draft, s.walls);
+      return {
+        doors: [...s.doors, snapped],
+        selectedItems: [{ id, type: 'door' }],
+      };
+    });
+  },
+
+  updateDoor: (id, patch) =>
+    set((s) => {
+      const door = s.doors.find((d) => d.id === id);
+      if (!door) return s;
+      const merged: Door = { ...door, ...patch };
+      const snapped =
+        patch.position || patch.rotation ? snapDoorToWall(merged, s.walls) : merged;
+      return { doors: s.doors.map((d) => (d.id === id ? snapped : d)) };
+    }),
+
+  setRelocatingBox: (id) =>
+    set((s) => ({
+      relocatingBoxId: id,
+      // Exit any zoom/selection so the user gets the panoramic view.
+      selectedItems: id ? [] : s.selectedItems,
+      view: id ? 'floor' : s.view,
+      selectedShelfId: id ? null : s.selectedShelfId,
+      selectedRow: id ? null : s.selectedRow,
+    })),
+
+  relocateToBox: (sourceId, destBoxId) =>
+    set((state) => {
+      if (sourceId === destBoxId) return state;
+      const source = state.boxes.find((b) => b.id === sourceId);
+      const dest = state.boxes.find((b) => b.id === destBoxId);
+      if (!source || !dest) return state;
+      const sourceShelf = state.shelves.find((sh) => sh.id === source.shelfId);
+      const destShelf = state.shelves.find((sh) => sh.id === dest.shelfId);
+      if (!sourceShelf || !destShelf) return state;
+
+      const boxes = state.boxes.map((b) => {
+        if (b.id === source.id) {
+          return {
+            ...b,
+            shelfId: dest.shelfId,
+            layerIndex: dest.layerIndex,
+            rowIndex: dest.rowIndex,
+            colIndex: dest.colIndex,
+            position: dest.position,
+            size: [...destShelf.boxSize] as [number, number, number],
+          };
+        }
+        if (b.id === dest.id) {
+          return {
+            ...b,
+            shelfId: source.shelfId,
+            layerIndex: source.layerIndex,
+            rowIndex: source.rowIndex,
+            colIndex: source.colIndex,
+            position: source.position,
+            size: [...sourceShelf.boxSize] as [number, number, number],
+          };
+        }
+        return b;
+      });
+      return { boxes, relocatingBoxId: null };
+    }),
+
+  clearBox: (id) =>
+    set((s) => ({
+      boxes: s.boxes.map((b) =>
+        b.id === id
+          ? {
+              ...b,
+              model: 'vazio',
+              color: MODEL_COLORS.vazio,
+              sku: 'VAZIO',
+              serial: undefined,
+            }
+          : b
+      ),
+      selectedItems: s.selectedItems.filter((it) => it.id !== id),
+    })),
+
+  openShelfInspection: (id, layer) => set({ inspectingShelf: { id, layer } }),
+  setInspectionLayer: (layer) =>
+    set((s) => (s.inspectingShelf ? { inspectingShelf: { ...s.inspectingShelf, layer } } : s)),
+  closeShelfInspection: () => set({ inspectingShelf: null }),
+
   removeItem: (id, type) =>
     set((s) => {
       const selectedItems = s.selectedItems.filter((it) => it.id !== id);
@@ -273,6 +394,7 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
       if (type === 'furniture')
         return { furniture: s.furniture.filter((f) => f.id !== id), selectedItems };
       if (type === 'box') return { boxes: s.boxes.filter((b) => b.id !== id), selectedItems };
+      if (type === 'door') return { doors: s.doors.filter((d) => d.id !== id), selectedItems };
       return s;
     }),
 

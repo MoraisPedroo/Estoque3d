@@ -8,6 +8,7 @@ import type CameraControlsImpl from 'camera-controls';
 import { Warehouse } from './Warehouse';
 import { Walls } from './Walls';
 import { Furniture } from './Furniture';
+import { Doors } from './Doors';
 import { BoxDragProxy } from './BoxDragProxy';
 import { useWarehouseStore } from '@/store/useWarehouseStore';
 import { cameraRef } from '@/lib/cameraRef';
@@ -60,8 +61,12 @@ function CameraDirector() {
     <CameraControls
       ref={localRef as unknown as React.RefObject<CameraControlsImpl>}
       makeDefault
-      minDistance={2}
-      maxDistance={120}
+      // Floor lock — the camera cannot dip below ground level (creates a virtual glass floor).
+      minPolarAngle={0}
+      maxPolarAngle={Math.PI / 2 - 0.01}
+      // Keep the user inside the warehouse — no infinite drift outside.
+      minDistance={3}
+      maxDistance={80}
       dollySpeed={0.6}
       truckSpeed={1.2}
     />
@@ -127,6 +132,7 @@ function useConcreteTexture() {
 function Floor() {
   const warehouseSize = useWarehouseStore((s) => s.warehouseSize);
   const selectItem = useWarehouseStore((s) => s.selectItem);
+  const setRelocatingBox = useWarehouseStore((s) => s.setRelocatingBox);
   const concrete = useConcreteTexture();
   const { width, depth } = warehouseSize;
 
@@ -140,7 +146,10 @@ function Floor() {
         position={[0, 0, 0]}
         receiveShadow
         onClick={(e) => {
-          if (e.delta < 5) selectItem(null);
+          if (e.delta > 5) return;
+          // Clicking empty floor cancels relocate flow and clears selection.
+          setRelocatingBox(null);
+          selectItem(null);
         }}
       >
         <planeGeometry args={[width, depth]} />
@@ -202,6 +211,7 @@ export function Scene() {
       <Floor />
       <Warehouse />
       <Walls />
+      <Doors />
       <Furniture />
       <BoxDragProxy />
 

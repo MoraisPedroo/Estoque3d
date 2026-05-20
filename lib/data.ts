@@ -1,5 +1,5 @@
 export type PrinterModel = 'laser' | 'jato' | 'multifuncional' | 'industrial' | 'vazio';
-export type ItemType = 'box' | 'shelf' | 'wall' | 'furniture';
+export type ItemType = 'box' | 'shelf' | 'wall' | 'furniture' | 'door';
 export type FurnitureType = 'desk' | 'chair' | 'table';
 export type TransformMode = 'translate' | 'rotate' | 'scale';
 
@@ -46,6 +46,15 @@ export interface Furniture {
   type: FurnitureType;
   position: [number, number, number];
   rotation: [number, number, number];
+}
+
+export interface Door {
+  id: string;
+  position: [number, number, number];
+  rotation: [number, number, number];
+  scale: [number, number, number];
+  color: string;
+  wallId: string | null;
 }
 
 export interface SelectedItem {

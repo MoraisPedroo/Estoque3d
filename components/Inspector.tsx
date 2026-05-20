@@ -39,6 +39,54 @@ export function Inspector() {
       {first.type === 'shelf' && <ShelfInspector id={first.id} />}
       {first.type === 'wall' && <WallInspector id={first.id} />}
       {first.type === 'furniture' && <FurnitureInspector id={first.id} />}
+      {first.type === 'door' && <DoorInspector id={first.id} />}
+    </div>
+  );
+}
+
+function DoorInspector({ id }: { id: string }) {
+  const door = useWarehouseStore((s) => s.doors.find((d) => d.id === id));
+  const updateDoor = useWarehouseStore((s) => s.updateDoor);
+  if (!door) return null;
+  return (
+    <div className="mt-2 space-y-3">
+      <div className="text-base font-semibold text-slate-100">Porta</div>
+      <label className="block text-[11px] text-slate-400">
+        Cor
+        <input
+          type="color"
+          value={door.color}
+          onChange={(e) => updateDoor(door.id, { color: e.target.value })}
+          className="mt-1 h-8 w-14 cursor-pointer rounded border border-slate-700 bg-transparent"
+        />
+      </label>
+      <div className="rounded-lg border border-slate-700/50 bg-slate-900/40 p-3 text-xs text-slate-400">
+        {door.wallId ? (
+          <>Encaixada na parede <span className="text-slate-100">{door.wallId}</span>. Arraste para alinhar a outra parede próxima.</>
+        ) : (
+          <>Solta. Arraste para perto de uma divisória para encaixar automaticamente.</>
+        )}
+      </div>
+      <div>
+        <div className="mb-1 text-[11px] uppercase text-slate-500">Tamanho (m)</div>
+        <div className="grid grid-cols-3 gap-2">
+          <NumberInput
+            label="L"
+            value={door.scale[0]}
+            onChange={(v) => updateDoor(door.id, { scale: [Math.max(0.4, v), door.scale[1], door.scale[2]] })}
+          />
+          <NumberInput
+            label="A"
+            value={door.scale[1]}
+            onChange={(v) => updateDoor(door.id, { scale: [door.scale[0], Math.max(0.8, v), door.scale[2]] })}
+          />
+          <NumberInput
+            label="Esp."
+            value={door.scale[2]}
+            onChange={(v) => updateDoor(door.id, { scale: [door.scale[0], door.scale[1], Math.max(0.02, v)] })}
+          />
+        </div>
+      </div>
     </div>
   );
 }

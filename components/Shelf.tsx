@@ -42,6 +42,10 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
   const toggleSelection = useWarehouseStore((s) => s.toggleSelection);
   const setHoveredBoxId = useWarehouseStore((s) => s.setHoveredBoxId);
   const updateShelf = useWarehouseStore((s) => s.updateShelf);
+  const relocatingBoxId = useWarehouseStore((s) => s.relocatingBoxId);
+  const relocateToBox = useWarehouseStore((s) => s.relocateToBox);
+  const setRelocatingBox = useWarehouseStore((s) => s.setRelocatingBox);
+  const openShelfInspection = useWarehouseStore((s) => s.openShelfInspection);
 
   const boxes = useWarehouseStore((s) =>
     s.boxes.filter((b) => b.shelfId === shelf.id)
@@ -154,13 +158,27 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
   };
 
   const handleBoxClick = (e: ThreeEvent<MouseEvent>) => {
-    if (!isFocused) return;
     if (e.instanceId == null) return;
-    e.stopPropagation();
     const b = boxes[e.instanceId];
     if (!b) return;
+
+    // Relocate flow: click any box (across the warehouse) chooses it as destination.
+    if (relocatingBoxId) {
+      if (b.id === relocatingBoxId) return; // can't drop on itself
+      e.stopPropagation();
+      const isEmpty = b.model === 'vazio';
+      if (isEmpty) {
+        relocateToBox(relocatingBoxId, b.id);
+      } else if (window.confirm('Deseja trocar os itens de posição?')) {
+        relocateToBox(relocatingBoxId, b.id);
+      }
+      return;
+    }
+
+    // Normal interaction needs the shelf to be zoomed-in.
+    if (!isFocused) return;
+    e.stopPropagation();
     if (appMode === 'view') {
-      // View mode: clicking a box opens the details modal
       selectItem({ id: b.id, type: 'box' });
       return;
     }
@@ -183,7 +201,14 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
 
   const handleShelfDoubleClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
-    if (appMode === 'edit' && view === 'floor') zoomToShelf(shelf.id);
+    if (appMode === 'edit' && view === 'floor') {
+      zoomToShelf(shelf.id);
+      return;
+    }
+    if (appMode === 'view') {
+      // Open the 2D grid inspector. If shelf has only one layer, jump straight to it.
+      openShelfInspection(shelf.id, shelf.depthLayers === 1 ? 0 : null);
+    }
   };
 
   const handleShelfOver = (e: ThreeEvent<PointerEvent>) => {
@@ -204,8 +229,28 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
     if (cameraRef.current) cameraRef.current.enabled = true;
     const g = groupRef.current;
     if (!g) return;
+
+    // Y-snap: if there's another shelf right below at similar X/Z, snap to its top.
+    const allShelves = useWarehouseStore.getState().shelves;
+    const STACK_RADIUS = 1.5;
+    const STACK_Y_TOL = 0.6;
+    let snappedY = g.position.y;
+    let bestDelta = Infinity;
+    for (const other of allShelves) {
+      if (other.id === shelf.id) continue;
+      const dx = g.position.x - other.position[0];
+      const dz = g.position.z - other.position[2];
+      if (Math.hypot(dx, dz) > STACK_RADIUS) continue;
+      const top = other.position[1] + rackHeightOf(other);
+      const delta = Math.abs(top - g.position.y);
+      if (delta < STACK_Y_TOL && delta < bestDelta) {
+        bestDelta = delta;
+        snappedY = top;
+      }
+    }
+
     updateShelf(shelf.id, {
-      position: [g.position.x, g.position.y, g.position.z],
+      position: [g.position.x, snappedY, g.position.z],
       rotation: [g.rotation.x, g.rotation.y, g.rotation.z],
     });
   };
@@ -268,7 +313,8 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
           mode={transformMode}
           translationSnap={TRANSLATION_SNAP}
           rotationSnap={ROTATION_SNAP}
-          showY={transformMode !== 'translate'}
+          // Shelves keep Y enabled (stacking); other types translate XZ only.
+          showY
           onMouseDown={handleGizmoMouseDown}
           onMouseUp={handleGizmoMouseUp}
           size={0.85}
@@ -296,8 +342,10 @@ function RackFrame({
   const t = RACK_FRAME_THICKNESS;
   const shelfThickness = 0.03;
 
+  // Open-top shelf: floors below the boxes only (no top cap).
+  // r=0 is the bottom floor, r=1..rows-1 are the boards between rows.
   const shelves = [];
-  for (let r = 0; r <= rows; r++) {
+  for (let r = 0; r < rows; r++) {
     const y = r * (boxHeight + 0.05) + 0.025;
     shelves.push(
       <mesh key={`shelf-${r}`} position={[0, y, 0]} castShadow receiveShadow>
