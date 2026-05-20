@@ -9,6 +9,7 @@ import { BoxDetailsModal } from '@/components/BoxDetailsModal';
 import { DragBanner } from '@/components/DragBanner';
 import { RelocateBanner } from '@/components/RelocateBanner';
 import { ShelfGridModal } from '@/components/ShelfGridModal';
+import { SearchPanel } from '@/components/SearchPanel';
 
 const Scene = dynamic(() => import('@/components/Scene').then((m) => m.Scene), {
   ssr: false,
@@ -33,6 +34,7 @@ export default function Page() {
         <Toolbar />
         <Inspector />
         <InfoPanel />
+        <SearchPanel />
         <DragBanner />
         <RelocateBanner />
         <BoxDetailsModal />

@@ -18,3 +18,11 @@ html, body, #__next { height: 100%; margin: 0; padding: 0; background: #0b0f17; 
 /* Modals open above all panels. */
 .ui-modal { position: fixed; inset: 0; pointer-events: auto; z-index: 50; }
 
+/* Side panels: bounded height so action buttons never disappear off-screen on smaller viewports. */
+.side-panel { max-height: 90vh; overflow-y: auto; overscroll-behavior: contain; }
+.side-panel::-webkit-scrollbar { width: 6px; }
+.side-panel::-webkit-scrollbar-track { background: transparent; }
+.side-panel::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.25); border-radius: 999px; }
+.side-panel::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.5); }
+.side-panel { scrollbar-width: thin; scrollbar-color: rgba(148, 163, 184, 0.25) transparent; }
+

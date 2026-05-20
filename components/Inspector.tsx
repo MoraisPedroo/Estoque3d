@@ -24,7 +24,7 @@ export function Inspector() {
     const allBoxes = selectedItems.every((it) => it.type === 'box');
     if (allBoxes) {
       return (
-        <div className="glass pointer-events-auto absolute right-5 top-28 z-10 w-[320px] rounded-2xl p-4">
+        <div className="glass side-panel pointer-events-auto absolute right-5 top-28 z-10 w-[320px] rounded-2xl p-4">
           <BulkBoxInspector ids={selectedItems.map((i) => i.id)} />
         </div>
       );
@@ -33,7 +33,7 @@ export function Inspector() {
 
   const first = selectedItems[0];
   return (
-    <div className="glass pointer-events-auto absolute right-5 top-28 z-10 w-[320px] rounded-2xl p-4">
+    <div className="glass side-panel pointer-events-auto absolute right-5 top-28 z-10 w-[320px] rounded-2xl p-4">
       <SinglePanelHeader item={first} />
       {first.type === 'box' && <BoxInspector id={first.id} />}
       {first.type === 'shelf' && <ShelfInspector id={first.id} />}
@@ -47,10 +47,28 @@ export function Inspector() {
 function DoorInspector({ id }: { id: string }) {
   const door = useWarehouseStore((s) => s.doors.find((d) => d.id === id));
   const updateDoor = useWarehouseStore((s) => s.updateDoor);
+  const setDoorPrincipal = useWarehouseStore((s) => s.setDoorPrincipal);
   if (!door) return null;
   return (
     <div className="mt-2 space-y-3">
-      <div className="text-base font-semibold text-slate-100">Porta</div>
+      <div className="flex items-center justify-between">
+        <div className="text-base font-semibold text-slate-100">Porta</div>
+        {door.isPrincipal && (
+          <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-300">
+            Principal
+          </span>
+        )}
+      </div>
+
+      <label className="flex items-center gap-2 text-xs text-slate-300">
+        <input
+          type="checkbox"
+          checked={door.isPrincipal}
+          onChange={(e) => setDoorPrincipal(door.id, e.target.checked)}
+          className="h-4 w-4 cursor-pointer accent-amber-400"
+        />
+        Definir como Porta Principal (entrada de rotas)
+      </label>
       <label className="block text-[11px] text-slate-400">
         Cor
         <input
@@ -370,6 +388,7 @@ function ShelfInspector({ id }: { id: string }) {
   const shelf = useWarehouseStore((s) => s.shelves.find((sh) => sh.id === id));
   const updateShelf = useWarehouseStore((s) => s.updateShelf);
   const zoomToShelf = useWarehouseStore((s) => s.zoomToShelf);
+  const openShelfInspection = useWarehouseStore((s) => s.openShelfInspection);
   const view = useWarehouseStore((s) => s.view);
 
   if (!shelf) return null;
@@ -404,6 +423,15 @@ function ShelfInspector({ id }: { id: string }) {
           </button>
         )}
       </div>
+
+      <button
+        onClick={() =>
+          openShelfInspection(shelf.id, shelf.depthLayers === 1 ? 0 : null)
+        }
+        className="w-full rounded-lg border border-sky-400/40 bg-sky-500/10 px-3 py-2 text-sm font-medium text-sky-200 transition hover:bg-sky-500/20"
+      >
+        🔍 Ver Mapa 2D (WMS)
+      </button>
 
       <label className="block text-[11px] text-slate-400">
         Layout da Estante (profundidade)

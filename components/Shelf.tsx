@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { ThreeEvent } from '@react-three/fiber';
-import { Text, Bvh, TransformControls } from '@react-three/drei';
+import { Text, Bvh, TransformControls, Edges, Html } from '@react-three/drei';
 import { RoundedBoxGeometry } from 'three-stdlib';
 import {
   RACK_FRAME_THICKNESS,
@@ -28,6 +28,7 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
   const groupRef = useRef<THREE.Group>(null!);
   const meshRef = useRef<THREE.InstancedMesh>(null!);
   const [groupReady, setGroupReady] = useState(false);
+  const [hovered, setHovered] = useState(false);
 
   const view = useWarehouseStore((s) => s.view);
   const appMode = useWarehouseStore((s) => s.appMode);
@@ -52,6 +53,16 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
   );
   const draggingBoxIds = useWarehouseStore((s) => s.draggingBoxIds);
   const draggingSet = useMemo(() => new Set(draggingBoxIds), [draggingBoxIds]);
+
+  const searchSelectedBoxId = useWarehouseStore((s) => s.searchSelectedBoxId);
+  const isSearchTarget = useWarehouseStore((s) => {
+    if (!s.searchSelectedBoxId) return false;
+    const b = s.boxes.find((x) => x.id === s.searchSelectedBoxId);
+    return !!b && b.shelfId === shelf.id;
+  });
+  const isSearchActive = !!searchSelectedBoxId;
+  // Dim non-target shelves to focus attention on the route.
+  const dimAmount = isSearchActive && !isSearchTarget ? 0.45 : 0;
 
   const isShelfSelected = selectedItems.some(
     (it) => it.type === 'shelf' && it.id === shelf.id
@@ -214,10 +225,12 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
   const handleShelfOver = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
     document.body.style.cursor = 'pointer';
+    setHovered(true);
   };
   const handleShelfOut = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
     document.body.style.cursor = 'auto';
+    setHovered(false);
   };
 
   // ---- Gizmo commit ----
@@ -271,6 +284,7 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
             rows={shelf.rows}
             boxHeight={shelf.boxSize[1]}
             highlighted={isShelfSelected || isFocused}
+            dim={dimAmount}
           />
         </group>
 
@@ -292,6 +306,8 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
               roughness={0.7}
               metalness={0.05}
               color="#ffffff"
+              transparent={dimAmount > 0}
+              opacity={dimAmount > 0 ? 1 - dimAmount : 1}
             />
           </instancedMesh>
         </Bvh>
@@ -299,12 +315,41 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
         <Text
           position={[0, rackHeight + 0.15, 0]}
           fontSize={0.32}
-          color={isShelfSelected || isFocused ? '#38bdf8' : '#94a3b8'}
+          color={isSearchTarget ? '#fbbf24' : isShelfSelected || isFocused ? '#38bdf8' : '#94a3b8'}
           anchorX="center"
           anchorY="middle"
         >
           {`Estante ${shelf.label}`}
         </Text>
+
+        {appMode === 'view' && hovered && view === 'floor' && (
+          <Html
+            position={[0, rackHeight + 0.55, 0]}
+            center
+            distanceFactor={8}
+            zIndexRange={[15, 0]}
+          >
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                openShelfInspection(shelf.id, shelf.depthLayers === 1 ? 0 : null);
+              }}
+              className="whitespace-nowrap rounded-full border border-sky-400/40 bg-slate-900/90 px-3 py-1.5 text-xs font-medium text-sky-200 shadow-lg shadow-sky-500/20 backdrop-blur-md transition hover:border-sky-300 hover:bg-slate-800"
+            >
+              🔍 Ver Mapa 2D
+            </button>
+          </Html>
+        )}
+
+        {/* Neon outline when this shelf is the search target. */}
+        {isSearchTarget && (
+          <mesh position={[0, rackHeight / 2, 0]}>
+            <boxGeometry args={[rackWidth + 0.1, rackHeight + 0.05, rackDepth + 0.1]} />
+            <meshBasicMaterial visible={false} />
+            <Edges color="#fbbf24" linewidth={2} threshold={1} />
+          </mesh>
+        )}
       </group>
 
       {groupReady && showGizmo && (
@@ -331,6 +376,7 @@ function RackFrame({
   rows,
   boxHeight,
   highlighted,
+  dim,
 }: {
   width: number;
   height: number;
@@ -338,7 +384,10 @@ function RackFrame({
   rows: number;
   boxHeight: number;
   highlighted: boolean;
+  dim: number;
 }) {
+  const useDim = dim > 0;
+  const dimOpacity = 1 - dim;
   const t = RACK_FRAME_THICKNESS;
   const shelfThickness = 0.03;
 
@@ -354,6 +403,8 @@ function RackFrame({
           color={highlighted ? '#334155' : '#1f2937'}
           roughness={0.7}
           metalness={0.4}
+          transparent={useDim}
+          opacity={useDim ? dimOpacity : 1}
         />
       </mesh>
     );
@@ -372,7 +423,13 @@ function RackFrame({
       {posts.map((p, i) => (
         <mesh key={`post-${i}`} position={p} castShadow receiveShadow>
           <boxGeometry args={[t, height, t]} />
-          <meshStandardMaterial color="#0f172a" roughness={0.5} metalness={0.6} />
+          <meshStandardMaterial
+            color="#0f172a"
+            roughness={0.5}
+            metalness={0.6}
+            transparent={useDim}
+            opacity={useDim ? dimOpacity : 1}
+          />
         </mesh>
       ))}
     </group>

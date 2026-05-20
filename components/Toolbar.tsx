@@ -37,7 +37,7 @@ export function Toolbar() {
       onlyItem.type === 'shelf');
 
   return (
-    <div className="glass pointer-events-auto absolute left-5 top-28 z-10 w-[260px] rounded-2xl p-4">
+    <div className="glass side-panel pointer-events-auto absolute left-5 top-28 z-10 w-[260px] rounded-2xl p-4">
       <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Dimensões do Galpão</div>
       <div className="mt-2 grid grid-cols-2 gap-2">
         <label className="text-[11px] text-slate-400">

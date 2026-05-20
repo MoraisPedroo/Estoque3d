@@ -2,21 +2,28 @@
 
 import { useEffect } from 'react';
 import { useWarehouseStore } from '@/store/useWarehouseStore';
-import { Box, MODEL_COLORS, MODEL_LABELS } from '@/lib/data';
+import { Box, MODEL_COLORS, MODEL_LABELS, PrinterModel } from '@/lib/data';
 
 const MODEL_TEXT = 'ZD230';
 
 function layerLabel(layer: number, total: number) {
   if (total === 1) return 'Camada única';
   if (total === 2) return layer === 0 ? 'Frente' : 'Fundo';
-  // total === 3
   return layer === 0 ? 'Frente' : layer === 1 ? 'Meio' : 'Fundo';
 }
 
 function slotCode(row: number, col: number) {
-  // "C9X3" style: column then row
   return `C${col + 1}X${row + 1}`;
 }
+
+// Solid status palette with on-color text — matches the spec's "modern WMS panel" look.
+const STATUS_STYLE: Record<PrinterModel, { bg: string; text: string; label: string }> = {
+  laser: { bg: '#3b82f6', text: '#ffffff', label: 'Laser' },
+  jato: { bg: '#10b981', text: '#062018', label: 'Jato' },
+  multifuncional: { bg: '#f59e0b', text: '#1a1207', label: 'Multifunc.' },
+  industrial: { bg: '#ec4899', text: '#ffffff', label: 'Industrial' },
+  vazio: { bg: 'transparent', text: '#64748b', label: 'Vazio' },
+};
 
 export function ShelfGridModal() {
   const inspecting = useWarehouseStore((s) => s.inspectingShelf);
@@ -38,7 +45,7 @@ export function ShelfGridModal() {
   const shelf = shelves.find((sh) => sh.id === inspecting.id);
   if (!shelf) return null;
 
-  // Step 1: layer chooser when none selected yet (small popup).
+  // Layer chooser
   if (inspecting.layer === null) {
     const options = Array.from({ length: shelf.depthLayers }, (_, i) => i);
     return (
@@ -73,47 +80,53 @@ export function ShelfGridModal() {
     );
   }
 
-  // Step 2: WMS-style 2D grid (CSS Grid laid out from shelf.rows × shelf.columns).
   const layer = inspecting.layer;
-  const layerBoxes = boxes.filter(
-    (b) => b.shelfId === shelf.id && b.layerIndex === layer
-  );
+  const layerBoxes = boxes.filter((b) => b.shelfId === shelf.id && b.layerIndex === layer);
   const byKey = new Map<string, Box>();
   layerBoxes.forEach((b) => byKey.set(`${b.rowIndex}:${b.colIndex}`, b));
 
   const filled = layerBoxes.filter((b) => b.model !== 'vazio').length;
+  const occupancy = layerBoxes.length > 0 ? Math.round((filled / layerBoxes.length) * 100) : 0;
+
+  // Counts by model for the summary bar
+  const counts: Partial<Record<PrinterModel, number>> = {};
+  layerBoxes.forEach((b) => (counts[b.model] = (counts[b.model] ?? 0) + 1));
 
   return (
     <div className="ui-modal flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/65 backdrop-blur-sm" onClick={close} />
-      <div className="glass relative z-10 w-[min(94vw,920px)] rounded-2xl p-6">
-        <div className="flex items-start justify-between gap-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={close} />
+
+      <div
+        className="relative z-10 w-[min(96vw,960px)] rounded-2xl border border-slate-700/60 bg-slate-950 p-6 shadow-[0_30px_90px_-20px_rgba(0,0,0,0.85)]"
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 border-b border-slate-800 pb-4">
           <div>
-            <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-              Mapa 2D · WMS
+            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-400">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-sky-400" />
+              WMS · MAPA 2D
             </div>
-            <div className="mt-1 text-xl font-semibold text-slate-100">
-              Estante {shelf.label}{' '}
-              <span className="text-sm font-normal text-slate-400">
-                — {layerLabel(layer, shelf.depthLayers)}
+            <div className="mt-1 flex items-baseline gap-3">
+              <h2 className="font-mono text-2xl font-semibold text-slate-100">
+                {shelf.label}
+              </h2>
+              <span className="text-sm text-slate-400">
+                {layerLabel(layer, shelf.depthLayers)} · {shelf.rows} × {shelf.columns}
               </span>
             </div>
-            <div className="mt-0.5 text-xs text-slate-400">
-              {shelf.rows} fileiras × {shelf.columns} colunas · {filled}/
-              {layerBoxes.length} ocupados
-            </div>
           </div>
+
           <div className="flex items-center gap-2">
             {shelf.depthLayers > 1 && (
-              <div className="flex gap-1">
+              <div className="flex gap-1 rounded-lg border border-slate-800 bg-slate-900 p-1">
                 {Array.from({ length: shelf.depthLayers }, (_, l) => (
                   <button
                     key={l}
                     onClick={() => setLayer(l)}
-                    className={`rounded-md px-3 py-1.5 text-xs transition ${
+                    className={`rounded-md px-3 py-1 text-xs transition ${
                       l === layer
-                        ? 'bg-sky-500 text-white'
-                        : 'border border-slate-700/70 bg-slate-800/60 text-slate-200 hover:bg-slate-700/70'
+                        ? 'bg-sky-500 text-white shadow-md shadow-sky-500/30'
+                        : 'text-slate-300 hover:bg-slate-800'
                     }`}
                   >
                     {layerLabel(l, shelf.depthLayers)}
@@ -123,49 +136,90 @@ export function ShelfGridModal() {
             )}
             <button
               onClick={close}
-              className="rounded-md border border-slate-700 bg-slate-800/60 px-3 py-1.5 text-sm text-slate-200 transition hover:bg-slate-700"
+              className="rounded-md border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-200 transition hover:bg-slate-700"
             >
-              ✕ Fechar
+              ✕
             </button>
           </div>
         </div>
 
-        <div className="mt-5 overflow-x-auto rounded-xl border border-slate-700/50 bg-slate-900/50 p-4">
+        {/* KPI strip */}
+        <div className="mt-4 grid grid-cols-4 gap-3">
+          <KPI label="Ocupação" value={`${occupancy}%`} accent="sky" />
+          <KPI label="Ocupados" value={`${filled}`} accent="emerald" />
+          <KPI label="Vazios" value={`${layerBoxes.length - filled}`} accent="slate" />
+          <KPI label="Total" value={`${layerBoxes.length}`} accent="slate" />
+        </div>
+
+        {/* Status legend */}
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
+          {(Object.keys(STATUS_STYLE) as PrinterModel[]).map((m) => {
+            const count = counts[m] ?? 0;
+            if (m === 'vazio' && count === 0) return null;
+            return (
+              <span key={m} className="inline-flex items-center gap-1.5">
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-sm"
+                  style={{ backgroundColor: STATUS_STYLE[m].bg, border: m === 'vazio' ? '1px dashed #475569' : 'none' }}
+                />
+                <span>{MODEL_LABELS[m]}</span>
+                {count > 0 && <span className="text-slate-500">· {count}</span>}
+              </span>
+            );
+          })}
+        </div>
+
+        {/* Grid */}
+        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/60 p-4">
           <div
-            className="grid gap-1.5"
+            className="grid gap-2"
             style={{
-              gridTemplateColumns: `48px repeat(${shelf.columns}, minmax(82px, 1fr))`,
+              gridTemplateColumns: `52px repeat(${shelf.columns}, minmax(86px, 1fr))`,
             }}
           >
-            {/* Column header */}
             <div />
             {Array.from({ length: shelf.columns }, (_, c) => (
               <div
                 key={`col-${c}`}
-                className="text-center text-[10px] uppercase tracking-wider text-slate-500"
+                className="text-center font-mono text-[11px] font-semibold tracking-wider text-slate-500"
               >
                 C{c + 1}
               </div>
             ))}
 
-            {/* Rows top→bottom = top row first (X3..X1 visually) */}
-            {Array.from({ length: shelf.rows }, (_, ri) => shelf.rows - 1 - ri).map(
-              (row) => (
-                <RowCells
-                  key={`row-${row}`}
-                  row={row}
-                  columns={shelf.columns}
-                  byKey={byKey}
-                />
-              )
-            )}
+            {Array.from({ length: shelf.rows }, (_, ri) => shelf.rows - 1 - ri).map((row) => (
+              <RowCells key={`row-${row}`} row={row} columns={shelf.columns} byKey={byKey} />
+            ))}
           </div>
         </div>
 
-        <p className="mt-3 text-[10px] text-slate-500">
-          Cada célula representa um slot físico da estante. Código C(coluna)X(fileira)
-          como na referência de mapa de armazém.
+        <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-[0.18em] text-slate-600">
+          C(coluna) X(fileira) · ZEBRA · ZD230
         </p>
+      </div>
+    </div>
+  );
+}
+
+function KPI({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent: 'sky' | 'emerald' | 'slate';
+}) {
+  const accentMap = {
+    sky: 'text-sky-300',
+    emerald: 'text-emerald-300',
+    slate: 'text-slate-300',
+  };
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2.5 shadow-inner">
+      <div className="text-[10px] uppercase tracking-wider text-slate-500">{label}</div>
+      <div className={`mt-0.5 font-mono text-lg font-semibold ${accentMap[accent]}`}>
+        {value}
       </div>
     </div>
   );
@@ -182,26 +236,25 @@ function RowCells({
 }) {
   return (
     <>
-      <div className="grid place-items-center text-[10px] uppercase tracking-wider text-slate-500">
+      <div className="grid place-items-center font-mono text-[11px] font-semibold tracking-wider text-slate-500">
         X{row + 1}
       </div>
       {Array.from({ length: columns }, (_, col) => {
         const box = byKey.get(`${row}:${col}`);
         const empty = !box || box.model === 'vazio';
+        const style = box ? STATUS_STYLE[box.model] : STATUS_STYLE.vazio;
         return (
           <div
             key={`${row}-${col}`}
-            className={`flex flex-col items-center justify-center rounded-md border px-2 py-2 text-[10px] transition ${
+            className={`group relative flex flex-col items-stretch justify-between rounded-lg px-2.5 py-2 text-[10px] transition ${
               empty
-                ? 'border-dashed border-slate-700/70 bg-slate-800/30 text-slate-500'
-                : 'border-slate-600/40 text-slate-900 shadow-sm'
+                ? 'border border-dashed border-slate-700 bg-slate-900/30 text-slate-500'
+                : 'border border-black/20 shadow-lg shadow-black/40'
             }`}
             style={
-              !empty
-                ? {
-                    background: `linear-gradient(135deg, ${MODEL_COLORS[box!.model]} 0%, #f5e6c4 95%)`,
-                  }
-                : undefined
+              empty
+                ? undefined
+                : { backgroundColor: style.bg, color: style.text }
             }
             title={
               empty
@@ -209,18 +262,37 @@ function RowCells({
                 : `${MODEL_LABELS[box!.model]} · SKU ${box!.sku}`
             }
           >
-            <span className="font-mono text-[10px] tracking-wider opacity-70">
-              {slotCode(row, col)}
-            </span>
-            {empty ? (
-              <span className="mt-0.5 font-medium">vazio</span>
-            ) : (
-              <>
-                <span className="mt-0.5 text-[12px] font-bold tracking-wide">
-                  {MODEL_TEXT}
+            <div className="flex items-center justify-between">
+              <span
+                className={`font-mono text-[10px] tracking-wider ${
+                  empty ? 'opacity-80' : 'opacity-75'
+                }`}
+              >
+                {slotCode(row, col)}
+              </span>
+              {!empty && (
+                <span
+                  className="rounded-full bg-black/25 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wider"
+                  style={{ color: style.text }}
+                >
+                  {style.label}
                 </span>
-                <span className="text-[9px] opacity-75">{box!.sku}</span>
-              </>
+              )}
+            </div>
+
+            {empty ? (
+              <div className="mt-1 grid place-items-center text-[11px] font-medium tracking-wider">
+                — VAZIO —
+              </div>
+            ) : (
+              <div className="mt-1.5">
+                <div className="font-mono text-[13px] font-bold leading-none tracking-wide">
+                  {MODEL_TEXT}
+                </div>
+                <div className="mt-0.5 truncate font-mono text-[9px] opacity-90">
+                  {box!.sku}
+                </div>
+              </div>
             )}
           </div>
         );
@@ -228,4 +300,3 @@ function RowCells({
     </>
   );
 }
-

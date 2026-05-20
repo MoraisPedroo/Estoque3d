@@ -34,6 +34,10 @@ interface WarehouseState {
   relocatingBoxId: string | null;
   /** Shelf opened in 2D grid inspection mode. */
   inspectingShelf: { id: string; layer: number | null } | null;
+  /** Box pinpointed by the search panel — drives the route line + shelf highlight. */
+  searchSelectedBoxId: string | null;
+  /** Friendly alert shown by SearchPanel when route can't be drawn (e.g. no principal door). */
+  routeAlert: string | null;
 
   view: ViewMode;
   selectedShelfId: string | null;
@@ -68,6 +72,7 @@ interface WarehouseState {
   addFurniture: (type: FurnitureType) => void;
   addDoor: () => void;
   updateDoor: (id: string, patch: Partial<Door>) => void;
+  setDoorPrincipal: (id: string, principal: boolean) => void;
 
   setRelocatingBox: (id: string | null) => void;
   relocateToBox: (sourceId: string, destBoxId: string) => void;
@@ -76,6 +81,9 @@ interface WarehouseState {
   openShelfInspection: (id: string, layer: number | null) => void;
   setInspectionLayer: (layer: number) => void;
   closeShelfInspection: () => void;
+
+  searchSelectBox: (boxId: string | null) => void;
+  dismissRouteAlert: () => void;
 
   removeItem: (id: string, type: ItemType) => void;
   removeSelectedItems: () => void;
@@ -104,6 +112,8 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
   doors: [],
   relocatingBoxId: null,
   inspectingShelf: null,
+  searchSelectedBoxId: null,
+  routeAlert: null,
 
   view: 'floor',
   selectedShelfId: null,
@@ -288,8 +298,8 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
         scale: [1, 2.1, 0.06],
         color: '#8b5a2b',
         wallId: null,
+        isPrincipal: s.doors.length === 0, // first door created is principal by default
       };
-      // Try to snap to an existing wall immediately on creation.
       const snapped = snapDoorToWall(draft, s.walls);
       return {
         doors: [...s.doors, snapped],
@@ -304,8 +314,26 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
       if (!door) return s;
       const merged: Door = { ...door, ...patch };
       const snapped =
-        patch.position || patch.rotation ? snapDoorToWall(merged, s.walls) : merged;
-      return { doors: s.doors.map((d) => (d.id === id ? snapped : d)) };
+        patch.position || patch.rotation || patch.scale
+          ? snapDoorToWall(merged, s.walls)
+          : merged;
+      let doors = s.doors.map((d) => (d.id === id ? snapped : d));
+      // If isPrincipal got promoted, demote all other doors.
+      if (patch.isPrincipal === true) {
+        doors = doors.map((d) => (d.id === id ? d : { ...d, isPrincipal: false }));
+      }
+      return { doors };
+    }),
+
+  setDoorPrincipal: (id, principal) =>
+    set((s) => {
+      if (!principal) {
+        return { doors: s.doors.map((d) => (d.id === id ? { ...d, isPrincipal: false } : d)) };
+      }
+      // Promote one + demote all others — enforces the single-principal rule.
+      return {
+        doors: s.doors.map((d) => ({ ...d, isPrincipal: d.id === id })),
+      };
     }),
 
   setRelocatingBox: (id) =>
@@ -376,6 +404,21 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
   setInspectionLayer: (layer) =>
     set((s) => (s.inspectingShelf ? { inspectingShelf: { ...s.inspectingShelf, layer } } : s)),
   closeShelfInspection: () => set({ inspectingShelf: null }),
+
+  searchSelectBox: (boxId) =>
+    set((s) => {
+      if (!boxId) return { searchSelectedBoxId: null, routeAlert: null };
+      const principal = s.doors.find((d) => d.isPrincipal);
+      if (!principal) {
+        return {
+          searchSelectedBoxId: null,
+          routeAlert:
+            'É necessário definir uma Porta Principal para traçar a rota. Crie ou marque uma porta como Principal no modo de edição.',
+        };
+      }
+      return { searchSelectedBoxId: boxId, routeAlert: null };
+    }),
+  dismissRouteAlert: () => set({ routeAlert: null }),
 
   removeItem: (id, type) =>
     set((s) => {

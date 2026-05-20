@@ -52,10 +52,14 @@ export interface Door {
   id: string;
   position: [number, number, number];
   rotation: [number, number, number];
+  /** scale[0] is the door width (also exposed as `width` helper below). */
   scale: [number, number, number];
   color: string;
   wallId: string | null;
+  isPrincipal: boolean;
 }
+
+export const doorWidth = (d: Door) => d.scale[0];
 
 export interface SelectedItem {
   id: string;
