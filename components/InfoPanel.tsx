@@ -1,13 +1,12 @@
 'use client';
 
 import { useWarehouseStore } from '@/store/useWarehouseStore';
-import { ROWS } from '@/lib/data';
 
 export function InfoPanel() {
   const view = useWarehouseStore((s) => s.view);
-  const racks = useWarehouseStore((s) => s.racks);
+  const shelves = useWarehouseStore((s) => s.shelves);
   const boxes = useWarehouseStore((s) => s.boxes);
-  const selectedRackId = useWarehouseStore((s) => s.selectedRackId);
+  const selectedShelfId = useWarehouseStore((s) => s.selectedShelfId);
   const selectedRow = useWarehouseStore((s) => s.selectedRow);
   const selectRow = useWarehouseStore((s) => s.selectRow);
 
@@ -18,22 +17,22 @@ export function InfoPanel() {
         <div className="glass rounded-2xl px-5 py-4">
           <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Planta Baixa</div>
           <div className="mt-1 text-sm text-slate-200">
-            {racks.length} estantes • {filled} caixas em estoque
+            {shelves.length} estantes • {filled} caixas em estoque
           </div>
           <div className="mt-0.5 text-xs text-slate-500">
-            Clique em uma estante para inspecionar
+            Clique para selecionar • duplo-clique para inspecionar
           </div>
         </div>
       </div>
     );
   }
 
-  const rack = racks.find((r) => r.id === selectedRackId);
-  if (!rack) return null;
+  const shelf = shelves.find((sh) => sh.id === selectedShelfId);
+  if (!shelf) return null;
 
-  const rackBoxes = boxes.filter((b) => b.rackId === rack.id);
-  const totalSlots = rackBoxes.length;
-  const filled = rackBoxes.filter((b) => b.model !== 'vazio').length;
+  const shelfBoxes = boxes.filter((b) => b.shelfId === shelf.id);
+  const totalSlots = shelfBoxes.length;
+  const filled = shelfBoxes.filter((b) => b.model !== 'vazio').length;
   const occupancy = totalSlots > 0 ? Math.round((filled / totalSlots) * 100) : 0;
 
   return (
@@ -42,7 +41,7 @@ export function InfoPanel() {
         <div className="flex items-baseline justify-between">
           <div>
             <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Estante</div>
-            <div className="text-2xl font-semibold text-slate-100">{rack.label}</div>
+            <div className="text-2xl font-semibold text-slate-100">{shelf.label}</div>
           </div>
           <div className="text-right">
             <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Ocupação</div>
@@ -59,20 +58,20 @@ export function InfoPanel() {
 
         <div className="mt-4">
           <div className="mb-2 text-xs uppercase tracking-[0.18em] text-slate-400">Fileiras</div>
-          <div className="flex gap-2">
-            {Array.from({ length: ROWS }, (_, i) => ROWS - 1 - i).map((row) => {
+          <div className="flex flex-wrap gap-2">
+            {Array.from({ length: shelf.rows }, (_, i) => shelf.rows - 1 - i).map((row) => {
               const active = selectedRow === row;
               return (
                 <button
                   key={row}
                   onClick={() => selectRow(active ? null : row)}
-                  className={`flex-1 rounded-lg border px-3 py-2 text-sm transition ${
+                  className={`flex-1 min-w-[60px] rounded-lg border px-3 py-2 text-sm transition ${
                     active
                       ? 'border-sky-400/60 bg-sky-400/15 text-sky-200'
                       : 'border-slate-700/60 bg-slate-800/40 text-slate-300 hover:bg-slate-700/40'
                   }`}
                 >
-                  Fileira {row + 1}
+                  F{row + 1}
                 </button>
               );
             })}

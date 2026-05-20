@@ -1,16 +1,16 @@
 'use client';
 
 import { useWarehouseStore } from '@/store/useWarehouseStore';
-import { Rack } from './Rack';
+import { Shelf } from './Shelf';
 import { Text } from '@react-three/drei';
 
 export function Warehouse() {
-  const racks = useWarehouseStore((s) => s.racks);
+  const shelves = useWarehouseStore((s) => s.shelves);
 
   return (
     <group>
-      {racks.map((rack) => (
-        <Rack key={rack.id} rack={rack} />
+      {shelves.map((shelf) => (
+        <Shelf key={shelf.id} shelf={shelf} />
       ))}
 
       <Text

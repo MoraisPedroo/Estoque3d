@@ -7,6 +7,9 @@ import { useWarehouseStore } from '@/store/useWarehouseStore';
 import { ItemType } from '@/lib/data';
 import { cameraRef } from '@/lib/cameraRef';
 
+const TRANSLATION_SNAP = 0.5;
+const ROTATION_SNAP = Math.PI / 2;
+
 interface Props {
   id: string;
   type: ItemType;
@@ -21,7 +24,15 @@ interface Props {
   children: ReactNode;
 }
 
-export function EditableObject({ id, type, position, rotation, scale, onCommit, children }: Props) {
+export function EditableObject({
+  id,
+  type,
+  position,
+  rotation,
+  scale,
+  onCommit,
+  children,
+}: Props) {
   const groupRef = useRef<THREE.Group>(null!);
   const [ready, setReady] = useState(false);
 
@@ -35,7 +46,6 @@ export function EditableObject({ id, type, position, rotation, scale, onCommit, 
     setReady(true);
   }, []);
 
-  // Keep object synced with store (when inspector edits numerically).
   useEffect(() => {
     const g = groupRef.current;
     if (!g) return;
@@ -44,19 +54,19 @@ export function EditableObject({ id, type, position, rotation, scale, onCommit, 
     if (scale) g.scale.set(scale[0], scale[1], scale[2]);
   }, [position, rotation, scale]);
 
+  const handleMouseDown = () => {
+    if (cameraRef.current) cameraRef.current.enabled = false;
+  };
+
   const handleMouseUp = () => {
+    if (cameraRef.current) cameraRef.current.enabled = true;
     const g = groupRef.current;
     if (!g) return;
-    if (cameraRef.current) cameraRef.current.enabled = true;
     onCommit({
       position: [g.position.x, g.position.y, g.position.z],
       rotation: [g.rotation.x, g.rotation.y, g.rotation.z],
       scale: [g.scale.x, g.scale.y, g.scale.z],
     });
-  };
-
-  const handleMouseDown = () => {
-    if (cameraRef.current) cameraRef.current.enabled = false;
   };
 
   return (
@@ -82,6 +92,9 @@ export function EditableObject({ id, type, position, rotation, scale, onCommit, 
         <TransformControls
           object={groupRef.current}
           mode={transformMode}
+          translationSnap={TRANSLATION_SNAP}
+          rotationSnap={ROTATION_SNAP}
+          showY={transformMode !== 'translate'}
           onMouseDown={handleMouseDown}
           onMouseUp={handleMouseUp}
           size={0.7}

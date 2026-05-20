@@ -5,7 +5,6 @@ import { Environment, SoftShadows, ContactShadows, CameraControls, Grid } from '
 import { Suspense, useEffect, useRef } from 'react';
 import type CameraControlsImpl from 'camera-controls';
 import { Warehouse } from './Warehouse';
-import { InstancedBoxes } from './InstancedBoxes';
 import { Walls } from './Walls';
 import { Furniture } from './Furniture';
 import { useWarehouseStore } from '@/store/useWarehouseStore';
@@ -15,8 +14,8 @@ function CameraDirector() {
   const localRef = useRef<CameraControlsImpl | null>(null);
 
   const view = useWarehouseStore((s) => s.view);
-  const selectedRackId = useWarehouseStore((s) => s.selectedRackId);
-  const racks = useWarehouseStore((s) => s.racks);
+  const selectedShelfId = useWarehouseStore((s) => s.selectedShelfId);
+  const shelves = useWarehouseStore((s) => s.shelves);
   const warehouseSize = useWarehouseStore((s) => s.warehouseSize);
 
   useEffect(() => {
@@ -24,7 +23,7 @@ function CameraDirector() {
     if (!controls) return;
     cameraRef.current = controls;
 
-    if (view === 'floor' || !selectedRackId) {
+    if (view === 'floor' || !selectedShelfId) {
       const maxDim = Math.max(warehouseSize.width, warehouseSize.depth);
       const camY = Math.max(maxDim * 0.7, 16);
       const camZ = Math.max(maxDim * 0.5, 14);
@@ -33,27 +32,27 @@ function CameraDirector() {
       return;
     }
 
-    const rack = racks.find((r) => r.id === selectedRackId);
-    if (!rack) return;
+    const shelf = shelves.find((s) => s.id === selectedShelfId);
+    if (!shelf) return;
 
-    const [rx, , rz] = rack.position;
-    const rackWidth = rack.columns * 0.95;
-    const distance = Math.max(rackWidth * 0.9, 5);
-
-    const forwardX = Math.sin(rack.rotationY);
-    const forwardZ = Math.cos(rack.rotationY);
+    const [sx, , sz] = shelf.position;
+    const shelfWidth = shelf.columns * 0.95;
+    const distance = Math.max(shelfWidth * 0.9, 5);
+    const rotY = shelf.rotation[1];
+    const forwardX = Math.sin(rotY);
+    const forwardZ = Math.cos(rotY);
 
     controls.smoothTime = 0.7;
     controls.setLookAt(
-      rx + forwardX * distance,
+      sx + forwardX * distance,
       1.6,
-      rz + forwardZ * distance,
-      rx,
+      sz + forwardZ * distance,
+      sx,
       0.9,
-      rz,
+      sz,
       true
     );
-  }, [view, selectedRackId, racks, warehouseSize]);
+  }, [view, selectedShelfId, shelves, warehouseSize]);
 
   return (
     <CameraControls
@@ -69,10 +68,21 @@ function CameraDirector() {
 
 function Floor() {
   const warehouseSize = useWarehouseStore((s) => s.warehouseSize);
+  const backToFloor = useWarehouseStore((s) => s.backToFloor);
+  const selectItem = useWarehouseStore((s) => s.selectItem);
   const { width, depth } = warehouseSize;
+
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0, 0]}
+        receiveShadow
+        onClick={(e) => {
+          // Click on empty floor deselects (without leaving rack view)
+          if (e.delta < 5) selectItem(null);
+        }}
+      >
         <planeGeometry args={[width, depth]} />
         <meshStandardMaterial color="#11151d" roughness={0.95} metalness={0.05} />
       </mesh>
@@ -127,7 +137,6 @@ export function Scene() {
 
       <Floor />
       <Warehouse />
-      <InstancedBoxes />
       <Walls />
       <Furniture />
 

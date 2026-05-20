@@ -13,6 +13,7 @@ const MODE_LABELS: Record<TransformMode, string> = {
 export function Toolbar() {
   const warehouseSize = useWarehouseStore((s) => s.warehouseSize);
   const setWarehouseSize = useWarehouseStore((s) => s.setWarehouseSize);
+  const addShelf = useWarehouseStore((s) => s.addShelf);
   const addWall = useWarehouseStore((s) => s.addWall);
   const addFurniture = useWarehouseStore((s) => s.addFurniture);
   const transformMode = useWarehouseStore((s) => s.transformMode);
@@ -25,7 +26,9 @@ export function Toolbar() {
   const applySize = () => setWarehouseSize(Number(w) || 0, Number(d) || 0);
 
   const showTransformModes =
-    selectedItem?.type === 'wall' || selectedItem?.type === 'furniture';
+    selectedItem?.type === 'wall' ||
+    selectedItem?.type === 'furniture' ||
+    selectedItem?.type === 'shelf';
 
   return (
     <div className="glass pointer-events-auto absolute left-5 top-28 z-10 w-[260px] rounded-2xl p-4">
@@ -65,6 +68,12 @@ export function Toolbar() {
 
       <div className="mt-5 text-xs uppercase tracking-[0.18em] text-slate-400">Inserir</div>
       <div className="mt-2 grid grid-cols-2 gap-2">
+        <button
+          onClick={addShelf}
+          className="col-span-2 rounded-md border border-sky-500/40 bg-sky-500/15 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/25"
+        >
+          + Estante
+        </button>
         <button
           onClick={addWall}
           className="rounded-md border border-slate-700/70 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 transition hover:bg-slate-700/70"

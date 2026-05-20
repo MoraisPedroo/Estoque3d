@@ -5,26 +5,22 @@ import { MODEL_COLORS, MODEL_LABELS, PrinterModel } from '@/lib/data';
 
 export function TopBar() {
   const view = useWarehouseStore((s) => s.view);
-  const selectedRackId = useWarehouseStore((s) => s.selectedRackId);
-  const racks = useWarehouseStore((s) => s.racks);
+  const selectedShelfId = useWarehouseStore((s) => s.selectedShelfId);
+  const shelves = useWarehouseStore((s) => s.shelves);
   const backToFloor = useWarehouseStore((s) => s.backToFloor);
 
-  const rack = racks.find((r) => r.id === selectedRackId);
+  const shelf = shelves.find((sh) => sh.id === selectedShelfId);
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between p-5">
       <div className="glass pointer-events-auto rounded-2xl px-5 py-3">
-        <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-          Gêmeo Digital
-        </div>
-        <div className="text-lg font-semibold text-slate-100">
-          Estoque de Impressoras
-        </div>
+        <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Gêmeo Digital</div>
+        <div className="text-lg font-semibold text-slate-100">Estoque de Impressoras</div>
         <div className="mt-1 text-xs text-slate-400">
           {view === 'floor'
-            ? 'Clique em uma estante para inspecionar'
-            : rack
-            ? `Estante ${rack.label} — clique em uma fileira para destacá-la`
+            ? 'Clique para selecionar • duplo-clique numa estante para o zoom 3D'
+            : shelf
+            ? `Estante ${shelf.label} — clique numa caixa ou no painel para destacar fileiras`
             : ''}
         </div>
       </div>

@@ -3,11 +3,13 @@ import {
   Box,
   Furniture,
   FurnitureType,
-  Rack,
+  ItemType,
   SelectedItem,
+  Shelf,
   TransformMode,
   Wall,
-  defaultRacks,
+  defaultShelves,
+  generateBoxesForShelf,
   generateInitialBoxes,
   uid,
 } from '@/lib/data';
@@ -16,13 +18,13 @@ export type ViewMode = 'floor' | 'rack';
 
 interface WarehouseState {
   warehouseSize: { width: number; depth: number };
-  racks: Rack[];
+  shelves: Shelf[];
   boxes: Box[];
   walls: Wall[];
   furniture: Furniture[];
 
   view: ViewMode;
-  selectedRackId: string | null;
+  selectedShelfId: string | null;
   selectedRow: number | null;
   selectedItem: SelectedItem | null;
   hoveredBoxId: string | null;
@@ -30,36 +32,42 @@ interface WarehouseState {
 
   setWarehouseSize: (width: number, depth: number) => void;
 
-  setView: (v: ViewMode) => void;
-  selectRack: (id: string | null) => void;
-  selectRow: (row: number | null) => void;
+  zoomToShelf: (id: string) => void;
   backToFloor: () => void;
+  selectRow: (row: number | null) => void;
 
   selectItem: (item: SelectedItem | null) => void;
   setHoveredBoxId: (id: string | null) => void;
   setTransformMode: (m: TransformMode) => void;
 
   updateBox: (id: string, patch: Partial<Box>) => void;
+  updateShelf: (id: string, patch: Partial<Shelf>) => void;
   updateWall: (id: string, patch: Partial<Wall>) => void;
   updateFurniture: (id: string, patch: Partial<Furniture>) => void;
 
+  addShelf: () => void;
   addWall: () => void;
   addFurniture: (type: FurnitureType) => void;
-  removeSelected: () => void;
+
+  removeItem: (id: string, type: ItemType) => void;
 }
 
-const racks = defaultRacks();
-const boxes = generateInitialBoxes(racks);
+const initialShelves = defaultShelves();
+const initialBoxes = generateInitialBoxes(initialShelves);
+
+const DIM_KEYS: Array<keyof Shelf> = ['rows', 'columns', 'boxSize'];
+const shouldRegenBoxes = (patch: Partial<Shelf>) =>
+  DIM_KEYS.some((k) => k in patch);
 
 export const useWarehouseStore = create<WarehouseState>((set, get) => ({
   warehouseSize: { width: 40, depth: 40 },
-  racks,
-  boxes,
+  shelves: initialShelves,
+  boxes: initialBoxes,
   walls: [],
   furniture: [],
 
   view: 'floor',
-  selectedRackId: null,
+  selectedShelfId: null,
   selectedRow: null,
   selectedItem: null,
   hoveredBoxId: null,
@@ -73,40 +81,87 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
       },
     }),
 
-  setView: (view) => set({ view }),
-  selectRack: (id) =>
+  zoomToShelf: (id) =>
     set({
-      selectedRackId: id,
-      view: id ? 'rack' : 'floor',
+      selectedShelfId: id,
+      view: 'rack',
       selectedRow: null,
-      selectedItem: id ? { id, type: 'rack' } : null,
+      selectedItem: { id, type: 'shelf' },
     }),
-  selectRow: (row) => set({ selectedRow: row }),
+
   backToFloor: () =>
     set({
-      selectedRackId: null,
+      selectedShelfId: null,
       selectedRow: null,
       view: 'floor',
       hoveredBoxId: null,
       selectedItem: null,
     }),
 
+  selectRow: (row) => set({ selectedRow: row }),
+
   selectItem: (item) => set({ selectedItem: item }),
   setHoveredBoxId: (id) => set({ hoveredBoxId: id }),
   setTransformMode: (m) => set({ transformMode: m }),
 
   updateBox: (id, patch) =>
-    set((s) => ({
-      boxes: s.boxes.map((b) => (b.id === id ? { ...b, ...patch } : b)),
-    })),
+    set((s) => ({ boxes: s.boxes.map((b) => (b.id === id ? { ...b, ...patch } : b)) })),
+
+  updateShelf: (id, patch) =>
+    set((s) => {
+      const idx = s.shelves.findIndex((sh) => sh.id === id);
+      if (idx < 0) return s;
+      const next: Shelf = {
+        ...s.shelves[idx],
+        ...patch,
+        rows: patch.rows !== undefined ? Math.max(1, Math.min(10, Math.floor(patch.rows))) : s.shelves[idx].rows,
+        columns:
+          patch.columns !== undefined
+            ? Math.max(1, Math.min(40, Math.floor(patch.columns)))
+            : s.shelves[idx].columns,
+        boxSize: patch.boxSize
+          ? [
+              Math.max(0.1, patch.boxSize[0]),
+              Math.max(0.1, patch.boxSize[1]),
+              Math.max(0.1, patch.boxSize[2]),
+            ]
+          : s.shelves[idx].boxSize,
+      };
+      const shelves = s.shelves.map((sh, i) => (i === idx ? next : sh));
+      let boxes = s.boxes;
+      if (shouldRegenBoxes(patch)) {
+        const otherBoxes = boxes.filter((b) => b.shelfId !== id);
+        const shelfBoxes = boxes.filter((b) => b.shelfId === id);
+        const fresh = generateBoxesForShelf(next, idx, shelfBoxes);
+        boxes = [...otherBoxes, ...fresh];
+      }
+      return { shelves, boxes };
+    }),
+
   updateWall: (id, patch) =>
-    set((s) => ({
-      walls: s.walls.map((w) => (w.id === id ? { ...w, ...patch } : w)),
-    })),
+    set((s) => ({ walls: s.walls.map((w) => (w.id === id ? { ...w, ...patch } : w)) })),
   updateFurniture: (id, patch) =>
     set((s) => ({
       furniture: s.furniture.map((f) => (f.id === id ? { ...f, ...patch } : f)),
     })),
+
+  addShelf: () => {
+    const id = uid('shelf');
+    set((s) => {
+      const newShelf: Shelf = {
+        id,
+        label: `S${s.shelves.length + 1}`,
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        rows: 3,
+        columns: 6,
+        boxSize: [0.9, 0.55, 0.7],
+      };
+      const shelves = [...s.shelves, newShelf];
+      const fresh = generateBoxesForShelf(newShelf, shelves.length - 1);
+      return { shelves, boxes: [...s.boxes, ...fresh], selectedItem: { id, type: 'shelf' } };
+    });
+  },
 
   addWall: () => {
     const id = uid('wall');
@@ -128,32 +183,33 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
   addFurniture: (type) => {
     const id = uid('fur');
     set((s) => ({
-      furniture: [
-        ...s.furniture,
-        {
-          id,
-          type,
-          position: [0, 0, 0],
-          rotation: [0, 0, 0],
-        },
-      ],
+      furniture: [...s.furniture, { id, type, position: [0, 0, 0], rotation: [0, 0, 0] }],
       selectedItem: { id, type: 'furniture' },
     }));
   },
 
-  removeSelected: () => {
-    const sel = get().selectedItem;
-    if (!sel) return;
-    if (sel.type === 'wall') {
-      set((s) => ({
-        walls: s.walls.filter((w) => w.id !== sel.id),
-        selectedItem: null,
-      }));
-    } else if (sel.type === 'furniture') {
-      set((s) => ({
-        furniture: s.furniture.filter((f) => f.id !== sel.id),
-        selectedItem: null,
-      }));
-    }
-  },
+  removeItem: (id, type) =>
+    set((s) => {
+      const clearSel = s.selectedItem?.id === id ? null : s.selectedItem;
+      if (type === 'shelf') {
+        return {
+          shelves: s.shelves.filter((sh) => sh.id !== id),
+          boxes: s.boxes.filter((b) => b.shelfId !== id),
+          selectedItem: clearSel,
+          selectedShelfId: s.selectedShelfId === id ? null : s.selectedShelfId,
+          view: s.selectedShelfId === id ? 'floor' : s.view,
+          selectedRow: s.selectedShelfId === id ? null : s.selectedRow,
+        };
+      }
+      if (type === 'wall') {
+        return { walls: s.walls.filter((w) => w.id !== id), selectedItem: clearSel };
+      }
+      if (type === 'furniture') {
+        return { furniture: s.furniture.filter((f) => f.id !== id), selectedItem: clearSel };
+      }
+      if (type === 'box') {
+        return { boxes: s.boxes.filter((b) => b.id !== id), selectedItem: clearSel };
+      }
+      return s;
+    }),
 }));
