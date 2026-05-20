@@ -6,6 +6,7 @@ import { Toolbar } from '@/components/Toolbar';
 import { Inspector } from '@/components/Inspector';
 import { InfoPanel } from '@/components/InfoPanel';
 import { BoxDetailsModal } from '@/components/BoxDetailsModal';
+import { DragBanner } from '@/components/DragBanner';
 
 const Scene = dynamic(() => import('@/components/Scene').then((m) => m.Scene), {
   ssr: false,
@@ -23,11 +24,16 @@ export default function Page() {
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-[#0b0f17]">
       <Scene />
-      <TopBar />
-      <Toolbar />
-      <Inspector />
-      <InfoPanel />
-      <BoxDetailsModal />
+      {/* UI overlay: container itself ignores pointer events so 3D stays clickable;
+          each child opts back in via the ui-layer CSS rule. */}
+      <div className="ui-layer">
+        <TopBar />
+        <Toolbar />
+        <Inspector />
+        <InfoPanel />
+        <DragBanner />
+        <BoxDetailsModal />
+      </div>
     </main>
   );
 }

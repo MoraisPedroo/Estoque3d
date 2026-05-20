@@ -32,6 +32,8 @@ interface WarehouseState {
   selectedItems: SelectedItem[];
   hoveredBoxId: string | null;
   transformMode: TransformMode;
+  /** IDs of boxes currently in the drag-proxy mode (hidden from InstancedMesh). */
+  draggingBoxIds: string[];
 
   setAppMode: (mode: AppMode) => void;
   setWarehouseSize: (width: number, depth: number) => void;
@@ -60,6 +62,9 @@ interface WarehouseState {
   removeSelectedItems: () => void;
 
   relocateBox: (boxId: string, newShelfId: string, layer: number, row: number, col: number) => void;
+
+  startDraggingSelected: () => void;
+  stopDragging: () => void;
 }
 
 const initialShelves = defaultShelves();
@@ -84,6 +89,7 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
   selectedItems: [],
   hoveredBoxId: null,
   transformMode: 'translate',
+  draggingBoxIds: [],
 
   setAppMode: (mode) =>
     set((s) => ({
@@ -332,4 +338,12 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
 
       return { boxes };
     }),
+
+  startDraggingSelected: () => {
+    const items = get().selectedItems.filter((it) => it.type === 'box');
+    if (items.length === 0) return;
+    set({ draggingBoxIds: items.map((it) => it.id) });
+  },
+
+  stopDragging: () => set({ draggingBoxIds: [] }),
 }));

@@ -62,7 +62,7 @@ export function BoxDetailsModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center">
+    <div className="ui-modal flex items-center justify-center">
       <div
         className="absolute inset-0 bg-black/55 backdrop-blur-sm"
         onClick={clearSelection}

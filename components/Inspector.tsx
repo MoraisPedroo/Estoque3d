@@ -94,6 +94,7 @@ function NumberInput({
 function BoxInspector({ id }: { id: string }) {
   const box = useWarehouseStore((s) => s.boxes.find((b) => b.id === id));
   const updateBox = useWarehouseStore((s) => s.updateBox);
+  const startDraggingSelected = useWarehouseStore((s) => s.startDraggingSelected);
 
   if (!box) return null;
 
@@ -176,6 +177,13 @@ function BoxInspector({ id }: { id: string }) {
           <NumberInput label="Z" value={box.position[2]} onChange={(v) => setPos(2, v)} />
         </div>
       </div>
+
+      <button
+        onClick={startDraggingSelected}
+        className="w-full rounded-lg bg-sky-500 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-400"
+      >
+        ⇄ Mudar de lugar (arrastar)
+      </button>
     </div>
   );
 }
@@ -185,6 +193,7 @@ function BulkBoxInspector({ ids }: { ids: string[] }) {
   const bulkUpdateBoxes = useWarehouseStore((s) => s.bulkUpdateBoxes);
   const clearSelection = useWarehouseStore((s) => s.clearSelection);
   const removeSelectedItems = useWarehouseStore((s) => s.removeSelectedItems);
+  const startDraggingSelected = useWarehouseStore((s) => s.startDraggingSelected);
 
   const [color, setColor] = useState('#60a5fa');
   const [model, setModel] = useState<PrinterModel>('laser');
@@ -286,6 +295,13 @@ function BulkBoxInspector({ ids }: { ids: string[] }) {
       </div>
 
       <button
+        onClick={startDraggingSelected}
+        className="w-full rounded-lg bg-sky-500 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-400"
+      >
+        ⇄ Mudar de lugar (arrastar)
+      </button>
+
+      <button
         onClick={clearSelection}
         className="w-full rounded-md border border-slate-700/70 bg-slate-800/60 px-3 py-1.5 text-xs text-slate-200 transition hover:bg-slate-700/70"
       >
@@ -294,7 +310,8 @@ function BulkBoxInspector({ ids }: { ids: string[] }) {
 
       <p className="text-[10px] text-slate-500">
         Dica: segure <kbd className="rounded bg-slate-800 px-1">Shift</kbd> + clique para
-        adicionar/remover caixas da seleção.
+        adicionar/remover caixas da seleção. No modo arrastar, as setas do gizmo
+        movem todas as caixas em blocos de 0,5 m.
       </p>
     </div>
   );

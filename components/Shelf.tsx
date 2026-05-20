@@ -14,6 +14,7 @@ import {
 } from '@/lib/data';
 import { useWarehouseStore } from '@/store/useWarehouseStore';
 import { cameraRef } from '@/lib/cameraRef';
+import { getBoxTexture } from '@/lib/boxTexture';
 
 // Reusable matrix helpers (mutated each frame — no allocation hotspots)
 const dummy = new THREE.Object3D();
@@ -45,6 +46,8 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
   const boxes = useWarehouseStore((s) =>
     s.boxes.filter((b) => b.shelfId === shelf.id)
   );
+  const draggingBoxIds = useWarehouseStore((s) => s.draggingBoxIds);
+  const draggingSet = useMemo(() => new Set(draggingBoxIds), [draggingBoxIds]);
 
   const isShelfSelected = selectedItems.some(
     (it) => it.type === 'shelf' && it.id === shelf.id
@@ -69,6 +72,9 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
   const geometry = useMemo(() => new RoundedBoxGeometry(1, 1, 1, 3, 0.06), []);
   useEffect(() => () => geometry.dispose(), [geometry]);
 
+  // Single shared Zebra/zd230 CanvasTexture for all boxes (instance color tints).
+  const boxMap = useMemo(() => getBoxTexture('zd230'), []);
+
   useEffect(() => {
     setGroupReady(true);
   }, []);
@@ -81,22 +87,26 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
     g.rotation.set(...shelf.rotation);
   }, [shelf.position, shelf.rotation]);
 
-  // Matrices: write scale + position per instance via dummy
+  // Matrices: write scale + position per instance via dummy. Boxes being dragged
+  // get a zero-scale matrix so they vanish from the InstancedMesh while the
+  // proxy meshes carry them visually.
   useEffect(() => {
     const mesh = meshRef.current;
     if (!mesh) return;
     for (let i = 0; i < boxes.length; i++) {
       const b = boxes[i];
+      const isDragging = draggingSet.has(b.id);
       dummy.position.set(b.position[0], b.position[1], b.position[2]);
       dummy.rotation.set(0, 0, 0);
-      dummy.scale.set(b.size[0], b.size[1], b.size[2]);
+      if (isDragging) dummy.scale.set(0, 0, 0);
+      else dummy.scale.set(b.size[0], b.size[1], b.size[2]);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
     }
     mesh.count = boxes.length;
     mesh.instanceMatrix.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [boxes]);
+  }, [boxes, draggingSet]);
 
   // Colors: hover / selection (single + multi) / row focus
   useEffect(() => {
@@ -232,7 +242,12 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
             onPointerOut={handleBoxOut}
             onClick={handleBoxClick}
           >
-            <meshStandardMaterial roughness={0.55} metalness={0.1} />
+            <meshStandardMaterial
+              map={boxMap}
+              roughness={0.7}
+              metalness={0.05}
+              color="#ffffff"
+            />
           </instancedMesh>
         </Bvh>
 

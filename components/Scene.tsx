@@ -8,6 +8,7 @@ import type CameraControlsImpl from 'camera-controls';
 import { Warehouse } from './Warehouse';
 import { Walls } from './Walls';
 import { Furniture } from './Furniture';
+import { BoxDragProxy } from './BoxDragProxy';
 import { useWarehouseStore } from '@/store/useWarehouseStore';
 import { cameraRef } from '@/lib/cameraRef';
 
@@ -202,6 +203,7 @@ export function Scene() {
       <Warehouse />
       <Walls />
       <Furniture />
+      <BoxDragProxy />
 
       <ContactShadows position={[0, 0.01, 0]} opacity={0.55} scale={80} blur={2.2} far={8} />
 
