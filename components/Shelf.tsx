@@ -29,6 +29,7 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
   const [groupReady, setGroupReady] = useState(false);
 
   const view = useWarehouseStore((s) => s.view);
+  const appMode = useWarehouseStore((s) => s.appMode);
   const selectedShelfId = useWarehouseStore((s) => s.selectedShelfId);
   const selectedRow = useWarehouseStore((s) => s.selectedRow);
   const selectedItems = useWarehouseStore((s) => s.selectedItems);
@@ -50,7 +51,7 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
   );
   const onlyShelfSelected = isShelfSelected && selectedItems.length === 1;
   const isFocused = selectedShelfId === shelf.id && view === 'rack';
-  const showGizmo = onlyShelfSelected && view === 'floor';
+  const showGizmo = appMode === 'edit' && onlyShelfSelected && view === 'floor';
 
   // Set of currently selected box ids (for color highlight)
   const selectedBoxIds = useMemo(() => {
@@ -62,6 +63,7 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
   const rackWidth = rackWidthOf(shelf);
   const rackHeight = rackHeightOf(shelf);
   const rackDepth = rackDepthOf(shelf);
+  const shelfCapacity = shelf.rows * shelf.columns * shelf.depthLayers;
 
   // Unit geometry — per-instance dummy.scale encodes the real box size.
   const geometry = useMemo(() => new RoundedBoxGeometry(1, 1, 1, 3, 0.06), []);
@@ -147,6 +149,11 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
     e.stopPropagation();
     const b = boxes[e.instanceId];
     if (!b) return;
+    if (appMode === 'view') {
+      // View mode: clicking a box opens the details modal
+      selectItem({ id: b.id, type: 'box' });
+      return;
+    }
     const shift = (e.nativeEvent as MouseEvent).shiftKey;
     if (shift) toggleSelection({ id: b.id, type: 'box' });
     else selectItem({ id: b.id, type: 'box' });
@@ -154,6 +161,11 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
 
   const handleShelfClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
+    if (appMode === 'view') {
+      // View mode: clicking a shelf in floor view zooms in; nothing else.
+      if (view === 'floor') zoomToShelf(shelf.id);
+      return;
+    }
     const shift = (e.nativeEvent as MouseEvent).shiftKey;
     if (shift) toggleSelection({ id: shelf.id, type: 'shelf' });
     else selectItem({ id: shelf.id, type: 'shelf' });
@@ -161,7 +173,7 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
 
   const handleShelfDoubleClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
-    if (view === 'floor') zoomToShelf(shelf.id);
+    if (appMode === 'edit' && view === 'floor') zoomToShelf(shelf.id);
   };
 
   const handleShelfOver = (e: ThreeEvent<PointerEvent>) => {
@@ -209,9 +221,11 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
 
         <Bvh firstHitOnly>
           <instancedMesh
-            key={`${shelf.id}-${boxes.length}`}
+            // Buffer key is the shelf's MAX capacity so the buffer stays stable
+            // across relocations (boxes added/removed don't trigger remount).
+            key={`${shelf.id}-${shelfCapacity}`}
             ref={meshRef}
-            args={[geometry, undefined, Math.max(boxes.length, 1)]}
+            args={[geometry, undefined, Math.max(shelfCapacity, 1)]}
             castShadow
             receiveShadow
             onPointerOver={handleBoxOver}

@@ -40,10 +40,11 @@ export function EditableObject({
   const transformMode = useWarehouseStore((s) => s.transformMode);
   const selectItem = useWarehouseStore((s) => s.selectItem);
   const toggleSelection = useWarehouseStore((s) => s.toggleSelection);
+  const appMode = useWarehouseStore((s) => s.appMode);
 
   const isInSelection = selectedItems.some((it) => it.id === id && it.type === type);
-  // Gizmo only when exactly one matching item is selected (avoids ambiguous multi-drag).
-  const showGizmo = isInSelection && selectedItems.length === 1;
+  // Gizmo only in edit mode + exactly one matching item selected.
+  const showGizmo = appMode === 'edit' && isInSelection && selectedItems.length === 1;
 
   useEffect(() => {
     setReady(true);

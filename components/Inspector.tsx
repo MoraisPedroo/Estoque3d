@@ -14,7 +14,9 @@ import {
 
 export function Inspector() {
   const selectedItems = useWarehouseStore((s) => s.selectedItems);
+  const appMode = useWarehouseStore((s) => s.appMode);
 
+  if (appMode !== 'edit') return null;
   if (selectedItems.length === 0) return null;
 
   // Multi-selection: bulk panel (currently for boxes; others fall back to first item)

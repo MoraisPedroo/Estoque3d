@@ -5,6 +5,7 @@ import { TopBar } from '@/components/TopBar';
 import { Toolbar } from '@/components/Toolbar';
 import { Inspector } from '@/components/Inspector';
 import { InfoPanel } from '@/components/InfoPanel';
+import { BoxDetailsModal } from '@/components/BoxDetailsModal';
 
 const Scene = dynamic(() => import('@/components/Scene').then((m) => m.Scene), {
   ssr: false,
@@ -26,6 +27,7 @@ export default function Page() {
       <Toolbar />
       <Inspector />
       <InfoPanel />
+      <BoxDetailsModal />
     </main>
   );
 }

@@ -5,11 +5,14 @@ import { MODEL_COLORS, MODEL_LABELS, PrinterModel } from '@/lib/data';
 
 export function TopBar() {
   const view = useWarehouseStore((s) => s.view);
+  const appMode = useWarehouseStore((s) => s.appMode);
+  const setAppMode = useWarehouseStore((s) => s.setAppMode);
   const selectedShelfId = useWarehouseStore((s) => s.selectedShelfId);
   const shelves = useWarehouseStore((s) => s.shelves);
   const backToFloor = useWarehouseStore((s) => s.backToFloor);
 
   const shelf = shelves.find((sh) => sh.id === selectedShelfId);
+  const isEdit = appMode === 'edit';
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between p-5">
@@ -42,14 +45,26 @@ export function TopBar() {
         </div>
       </div>
 
-      {view === 'rack' && (
+      <div className="pointer-events-auto flex flex-col items-end gap-2">
         <button
-          onClick={backToFloor}
-          className="glass pointer-events-auto rounded-2xl px-4 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-slate-800/70"
+          onClick={() => setAppMode(isEdit ? 'view' : 'edit')}
+          className={`glass rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
+            isEdit
+              ? 'bg-amber-500/20 text-amber-200 hover:bg-amber-500/30'
+              : 'bg-sky-500/20 text-sky-100 hover:bg-sky-500/30'
+          }`}
         >
-          ← Voltar à planta
+          {isEdit ? '✕ Sair da edição' : '✎ Editar mapa'}
         </button>
-      )}
+        {view === 'rack' && (
+          <button
+            onClick={backToFloor}
+            className="glass rounded-2xl px-4 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-slate-800/70"
+          >
+            ← Voltar à planta
+          </button>
+        )}
+      </div>
     </div>
   );
 }

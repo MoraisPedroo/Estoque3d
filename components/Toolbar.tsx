@@ -11,6 +11,7 @@ const MODE_LABELS: Record<TransformMode, string> = {
 };
 
 export function Toolbar() {
+  const appMode = useWarehouseStore((s) => s.appMode);
   const warehouseSize = useWarehouseStore((s) => s.warehouseSize);
   const setWarehouseSize = useWarehouseStore((s) => s.setWarehouseSize);
   const addShelf = useWarehouseStore((s) => s.addShelf);
@@ -24,6 +25,8 @@ export function Toolbar() {
   const [d, setD] = useState(warehouseSize.depth);
 
   const applySize = () => setWarehouseSize(Number(w) || 0, Number(d) || 0);
+
+  if (appMode !== 'edit') return null;
 
   const onlyItem = selectedItems.length === 1 ? selectedItems[0] : null;
   const showTransformModes =

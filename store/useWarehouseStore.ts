@@ -11,12 +11,15 @@ import {
   defaultShelves,
   generateBoxesForShelf,
   generateInitialBoxes,
+  localBoxPosition,
   uid,
 } from '@/lib/data';
 
 export type ViewMode = 'floor' | 'rack';
+export type AppMode = 'view' | 'edit';
 
 interface WarehouseState {
+  appMode: AppMode;
   warehouseSize: { width: number; depth: number };
   shelves: Shelf[];
   boxes: Box[];
@@ -30,6 +33,7 @@ interface WarehouseState {
   hoveredBoxId: string | null;
   transformMode: TransformMode;
 
+  setAppMode: (mode: AppMode) => void;
   setWarehouseSize: (width: number, depth: number) => void;
 
   zoomToShelf: (id: string) => void;
@@ -54,6 +58,8 @@ interface WarehouseState {
 
   removeItem: (id: string, type: ItemType) => void;
   removeSelectedItems: () => void;
+
+  relocateBox: (boxId: string, newShelfId: string, layer: number, row: number, col: number) => void;
 }
 
 const initialShelves = defaultShelves();
@@ -65,6 +71,7 @@ const shouldRegenBoxes = (patch: Partial<Shelf>) => DIM_KEYS.some((k) => k in pa
 const sameItem = (a: SelectedItem, b: SelectedItem) => a.id === b.id && a.type === b.type;
 
 export const useWarehouseStore = create<WarehouseState>((set, get) => ({
+  appMode: 'view',
   warehouseSize: { width: 40, depth: 40 },
   shelves: initialShelves,
   boxes: initialBoxes,
@@ -77,6 +84,16 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
   selectedItems: [],
   hoveredBoxId: null,
   transformMode: 'translate',
+
+  setAppMode: (mode) =>
+    set((s) => ({
+      appMode: mode,
+      // leaving edit mode → drop architectural selection
+      selectedItems:
+        mode === 'view'
+          ? s.selectedItems.filter((it) => it.type === 'box')
+          : s.selectedItems,
+    })),
 
   setWarehouseSize: (width, depth) =>
     set({
@@ -258,4 +275,61 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
     if (items.length === 0) return;
     items.forEach((it) => get().removeItem(it.id, it.type));
   },
+
+  relocateBox: (boxId, newShelfId, layer, row, col) =>
+    set((state) => {
+      const box = state.boxes.find((b) => b.id === boxId);
+      const destShelf = state.shelves.find((sh) => sh.id === newShelfId);
+      if (!box || !destShelf) return state;
+
+      const lyr = Math.max(0, Math.min(destShelf.depthLayers - 1, Math.floor(layer)));
+      const r = Math.max(0, Math.min(destShelf.rows - 1, Math.floor(row)));
+      const c = Math.max(0, Math.min(destShelf.columns - 1, Math.floor(col)));
+      const newPos = localBoxPosition(destShelf, lyr, r, c);
+
+      const occupant = state.boxes.find(
+        (b) =>
+          b.id !== boxId &&
+          b.shelfId === newShelfId &&
+          b.layerIndex === lyr &&
+          b.rowIndex === r &&
+          b.colIndex === c
+      );
+
+      const sourceShelf = state.shelves.find((sh) => sh.id === box.shelfId);
+      const occupantOldPos =
+        sourceShelf
+          ? localBoxPosition(sourceShelf, box.layerIndex, box.rowIndex, box.colIndex)
+          : box.position;
+
+      const boxes = state.boxes.map((b) => {
+        if (b.id === boxId) {
+          return {
+            ...b,
+            shelfId: newShelfId,
+            layerIndex: lyr,
+            rowIndex: r,
+            colIndex: c,
+            position: newPos,
+            size: [...destShelf.boxSize] as [number, number, number],
+          };
+        }
+        if (occupant && b.id === occupant.id) {
+          return {
+            ...b,
+            shelfId: box.shelfId,
+            layerIndex: box.layerIndex,
+            rowIndex: box.rowIndex,
+            colIndex: box.colIndex,
+            position: occupantOldPos,
+            size: sourceShelf
+              ? ([...sourceShelf.boxSize] as [number, number, number])
+              : b.size,
+          };
+        }
+        return b;
+      });
+
+      return { boxes };
+    }),
 }));
