@@ -70,8 +70,9 @@ interface WarehouseState {
   addShelf: () => void;
   addWall: () => void;
   addFurniture: (type: FurnitureType) => void;
-  addDoor: () => void;
+  addDoorToWall: (wallId: string, fraction?: number) => void;
   updateDoor: (id: string, patch: Partial<Door>) => void;
+  setDoorPositionAlongWall: (doorId: string, fraction: number) => void;
   setDoorPrincipal: (id: string, principal: boolean) => void;
 
   setRelocatingBox: (id: string | null) => void;
@@ -288,25 +289,62 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
     }));
   },
 
-  addDoor: () => {
+  addDoorToWall: (wallId, fraction = 0.5) => {
     const id = uid('door');
     set((s) => {
+      const wall = s.walls.find((w) => w.id === wallId);
+      if (!wall) return s;
+      const cos = Math.cos(wall.rotation[1]);
+      const sin = Math.sin(wall.rotation[1]);
+      const offset = (fraction - 0.5) * wall.scale[0];
+      const doorH = Math.min(2.1, wall.scale[1] * 0.9);
+      const doorY = wall.position[1] - wall.scale[1] / 2 + doorH / 2;
       const draft: Door = {
         id,
-        position: [0, 1.05, 0],
-        rotation: [0, 0, 0],
-        scale: [1, 2.1, 0.06],
+        position: [
+          wall.position[0] + cos * offset,
+          doorY,
+          wall.position[2] - sin * offset,
+        ],
+        rotation: [0, wall.rotation[1], 0],
+        scale: [1, doorH, wall.scale[2] * 1.05],
         color: '#8b5a2b',
-        wallId: null,
-        isPrincipal: s.doors.length === 0, // first door created is principal by default
+        wallId: wall.id,
+        isPrincipal: s.doors.length === 0,
       };
       const snapped = snapDoorToWall(draft, s.walls);
+      // Force association with the wall the user chose, even if a different one is closer.
+      snapped.wallId = wall.id;
       return {
         doors: [...s.doors, snapped],
         selectedItems: [{ id, type: 'door' }],
       };
     });
   },
+
+  setDoorPositionAlongWall: (doorId, fraction) =>
+    set((s) => {
+      const door = s.doors.find((d) => d.id === doorId);
+      if (!door || !door.wallId) return s;
+      const wall = s.walls.find((w) => w.id === door.wallId);
+      if (!wall) return s;
+      const f = Math.max(0, Math.min(1, fraction));
+      const cos = Math.cos(wall.rotation[1]);
+      const sin = Math.sin(wall.rotation[1]);
+      const offset = (f - 0.5) * wall.scale[0];
+      const next: Door = {
+        ...door,
+        position: [
+          wall.position[0] + cos * offset,
+          door.position[1],
+          wall.position[2] - sin * offset,
+        ],
+        rotation: [0, wall.rotation[1], 0],
+      };
+      const snapped = snapDoorToWall(next, s.walls);
+      snapped.wallId = wall.id;
+      return { doors: s.doors.map((d) => (d.id === doorId ? snapped : d)) };
+    }),
 
   updateDoor: (id, patch) =>
     set((s) => {

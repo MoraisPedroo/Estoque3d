@@ -15,8 +15,11 @@ import {
 export function Inspector() {
   const selectedItems = useWarehouseStore((s) => s.selectedItems);
   const appMode = useWarehouseStore((s) => s.appMode);
+  const inspectingShelf = useWarehouseStore((s) => s.inspectingShelf);
+  const relocatingBoxId = useWarehouseStore((s) => s.relocatingBoxId);
 
   if (appMode !== 'edit') return null;
+  if (inspectingShelf || relocatingBoxId) return null;
   if (selectedItems.length === 0) return null;
 
   // Multi-selection: bulk panel (currently for boxes; others fall back to first item)
@@ -509,7 +512,13 @@ function ShelfInspector({ id }: { id: string }) {
 // ===== Wall =====
 function WallInspector({ id }: { id: string }) {
   const wall = useWarehouseStore((s) => s.walls.find((w) => w.id === id));
+  const wallDoors = useWarehouseStore((s) => s.doors.filter((d) => d.wallId === id));
   const updateWall = useWarehouseStore((s) => s.updateWall);
+  const addDoorToWall = useWarehouseStore((s) => s.addDoorToWall);
+  const setDoorPositionAlongWall = useWarehouseStore((s) => s.setDoorPositionAlongWall);
+  const updateDoor = useWarehouseStore((s) => s.updateDoor);
+  const setDoorPrincipal = useWarehouseStore((s) => s.setDoorPrincipal);
+  const removeItem = useWarehouseStore((s) => s.removeItem);
 
   if (!wall) return null;
 
@@ -521,6 +530,16 @@ function WallInspector({ id }: { id: string }) {
     const arr = [...wall[key]] as [number, number, number];
     arr[i] = v;
     updateWall(wall.id, { [key]: arr } as any);
+  };
+
+  // Compute slider fraction [0..1] from a door's current world position along the wall.
+  const doorFraction = (door: typeof wallDoors[number]) => {
+    const cos = Math.cos(wall.rotation[1]);
+    const sin = Math.sin(wall.rotation[1]);
+    const dx = door.position[0] - wall.position[0];
+    const dz = door.position[2] - wall.position[2];
+    const localX = cos * dx - sin * dz;
+    return (localX + wall.scale[0] / 2) / wall.scale[0];
   };
 
   return (
@@ -575,6 +594,103 @@ function WallInspector({ id }: { id: string }) {
           step={Math.PI / 2}
           onChange={(v) => set('rotation', 1, v)}
         />
+      </div>
+
+      {/* Doors are now a property of the wall (CSG-cut, slider-positioned). */}
+      <div className="rounded-xl border border-slate-700/50 bg-slate-900/40 p-3">
+        <div className="flex items-center justify-between">
+          <div className="text-[11px] uppercase tracking-wider text-slate-400">
+            Portas nesta parede
+          </div>
+          <button
+            onClick={() => addDoorToWall(wall.id, 0.5)}
+            className="rounded-md bg-sky-500 px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-sky-400"
+          >
+            + Adicionar Porta
+          </button>
+        </div>
+        {wallDoors.length === 0 ? (
+          <p className="mt-2 text-[11px] text-slate-500">
+            Nenhuma porta. O CSG vai abrir um vão real na parede assim que você adicionar.
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-2.5">
+            {wallDoors.map((d) => (
+              <li
+                key={d.id}
+                className="rounded-lg border border-slate-700/60 bg-slate-900/60 p-2.5"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-100">
+                    Porta
+                    {d.isPrincipal && (
+                      <span className="ml-1.5 rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-300">
+                        Principal
+                      </span>
+                    )}
+                  </span>
+                  <button
+                    onClick={() => removeItem(d.id, 'door')}
+                    className="rounded border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-300 transition hover:bg-red-500/20"
+                  >
+                    Remover
+                  </button>
+                </div>
+
+                <div className="mt-2">
+                  <div className="mb-0.5 flex items-center justify-between text-[10px] text-slate-500">
+                    <span>Posição ao longo do comprimento</span>
+                    <span className="font-mono text-slate-400">
+                      {(doorFraction(d) * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={doorFraction(d)}
+                    onChange={(e) =>
+                      setDoorPositionAlongWall(d.id, Number(e.target.value))
+                    }
+                    className="w-full accent-sky-400"
+                  />
+                </div>
+
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <NumberInput
+                    label="Largura"
+                    value={d.scale[0]}
+                    onChange={(v) =>
+                      updateDoor(d.id, {
+                        scale: [Math.max(0.4, v), d.scale[1], d.scale[2]],
+                      })
+                    }
+                  />
+                  <NumberInput
+                    label="Altura"
+                    value={d.scale[1]}
+                    onChange={(v) =>
+                      updateDoor(d.id, {
+                        scale: [d.scale[0], Math.max(0.8, v), d.scale[2]],
+                      })
+                    }
+                  />
+                </div>
+
+                <label className="mt-2 flex items-center gap-2 text-[11px] text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={d.isPrincipal}
+                    onChange={(e) => setDoorPrincipal(d.id, e.target.checked)}
+                    className="h-3.5 w-3.5 cursor-pointer accent-amber-400"
+                  />
+                  Porta Principal (origem das rotas)
+                </label>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

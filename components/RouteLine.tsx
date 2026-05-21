@@ -1,15 +1,20 @@
 'use client';
 
 import { useMemo } from 'react';
-import { QuadraticBezierLine } from '@react-three/drei';
+import { CatmullRomLine } from '@react-three/drei';
 import { useWarehouseStore } from '@/store/useWarehouseStore';
 import { rackHeightOf } from '@/lib/data';
+import { astar, buildGrid, simplifyPath } from '@/lib/pathfinding';
+
+const FLOOR_Y = 0.05;
 
 export function RouteLine() {
   const searchSelectedBoxId = useWarehouseStore((s) => s.searchSelectedBoxId);
   const boxes = useWarehouseStore((s) => s.boxes);
   const shelves = useWarehouseStore((s) => s.shelves);
+  const walls = useWarehouseStore((s) => s.walls);
   const doors = useWarehouseStore((s) => s.doors);
+  const warehouseSize = useWarehouseStore((s) => s.warehouseSize);
 
   const route = useMemo(() => {
     if (!searchSelectedBoxId) return null;
@@ -19,61 +24,73 @@ export function RouteLine() {
     const principal = doors.find((d) => d.isPrincipal);
     if (!shelf || !principal) return null;
 
-    // Start at the principal door position, slightly above the floor for visibility.
-    const start: [number, number, number] = [
-      principal.position[0],
-      0.05,
-      principal.position[2],
+    const grid = buildGrid(warehouseSize, shelves, walls);
+    const start: [number, number] = [principal.position[0], principal.position[2]];
+    // Aim a metre in front of the shelf so the path stops at the aisle, not inside the rack.
+    const cos = Math.cos(shelf.rotation[1]);
+    const sin = Math.sin(shelf.rotation[1]);
+    const standoff = 1.2;
+    const end: [number, number] = [
+      shelf.position[0] + sin * standoff,
+      shelf.position[2] + cos * standoff,
     ];
-    // End at the shelf barycentre (centre of the shelf body).
-    const halfHeight = rackHeightOf(shelf) / 2;
-    const end: [number, number, number] = [
+
+    const path = astar(grid, start, end);
+    if (!path || path.length < 2) return null;
+
+    // Make the curve start exactly at the door and finish at the standoff point.
+    const waypoints: Array<[number, number, number]> = [];
+    waypoints.push([principal.position[0], FLOOR_Y, principal.position[2]]);
+    for (const [x, z] of simplifyPath(path)) waypoints.push([x, FLOOR_Y, z]);
+    waypoints.push([end[0], FLOOR_Y, end[1]]);
+
+    const destination: [number, number, number] = [
       shelf.position[0],
-      shelf.position[1] + halfHeight,
+      shelf.position[1] + rackHeightOf(shelf) / 2,
       shelf.position[2],
     ];
-    // Midpoint: between the two on XZ, arched upward so the curve clears furniture.
-    const mid: [number, number, number] = [
-      (start[0] + end[0]) / 2,
-      Math.max(start[1], end[1]) + 1.4,
-      (start[2] + end[2]) / 2,
-    ];
-    return { start, mid, end };
-  }, [searchSelectedBoxId, boxes, shelves, doors]);
+
+    return { waypoints, destination };
+  }, [searchSelectedBoxId, boxes, shelves, walls, doors, warehouseSize]);
 
   if (!route) return null;
 
   return (
     <group>
-      {/* Glowing route */}
-      <QuadraticBezierLine
-        start={route.start}
-        mid={route.mid}
-        end={route.end}
+      {/* Soft halo behind the route — wide, low opacity */}
+      <CatmullRomLine
+        points={route.waypoints}
         color="#fbbf24"
-        lineWidth={5}
-        transparent
-        opacity={0.9}
+        lineWidth={14}
+        curveType="catmullrom"
+        tension={0.5}
+        segments={64}
+        {...({ transparent: true, opacity: 0.18 } as any)}
       />
-      {/* Soft halo behind it */}
-      <QuadraticBezierLine
-        start={route.start}
-        mid={route.mid}
-        end={route.end}
-        color="#fbbf24"
-        lineWidth={12}
-        transparent
-        opacity={0.18}
+      {/* Crisp guiding line on top */}
+      <CatmullRomLine
+        points={route.waypoints}
+        color="#fde68a"
+        lineWidth={4}
+        curveType="catmullrom"
+        tension={0.5}
+        segments={64}
+        {...({ transparent: true, opacity: 0.95 } as any)}
       />
-      {/* Origin marker — pulsing disc on the floor next to the principal door */}
-      <mesh position={[route.start[0], 0.02, route.start[2]]} rotation={[-Math.PI / 2, 0, 0]}>
+
+      {/* Origin marker at the principal door */}
+      <mesh
+        position={[route.waypoints[0][0], 0.02, route.waypoints[0][2]]}
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
         <ringGeometry args={[0.35, 0.55, 32]} />
-        <meshBasicMaterial color="#fbbf24" transparent opacity={0.7} />
+        <meshBasicMaterial color="#fbbf24" transparent opacity={0.85} />
       </mesh>
-      {/* Destination marker — column of light on the shelf */}
-      <mesh position={[route.end[0], route.end[1], route.end[2]]}>
-        <sphereGeometry args={[0.18, 16, 16]} />
-        <meshBasicMaterial color="#fde68a" transparent opacity={0.85} />
+
+      {/* Destination marker — column rising from floor to shelf centre */}
+      <mesh position={route.destination}>
+        <sphereGeometry args={[0.2, 16, 16]} />
+        <meshBasicMaterial color="#fde68a" transparent opacity={0.95} />
       </mesh>
     </group>
   );

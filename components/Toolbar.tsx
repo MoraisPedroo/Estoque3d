@@ -16,8 +16,9 @@ export function Toolbar() {
   const setWarehouseSize = useWarehouseStore((s) => s.setWarehouseSize);
   const addShelf = useWarehouseStore((s) => s.addShelf);
   const addWall = useWarehouseStore((s) => s.addWall);
-  const addDoor = useWarehouseStore((s) => s.addDoor);
   const addFurniture = useWarehouseStore((s) => s.addFurniture);
+  const inspectingShelf = useWarehouseStore((s) => s.inspectingShelf);
+  const relocatingBoxId = useWarehouseStore((s) => s.relocatingBoxId);
   const transformMode = useWarehouseStore((s) => s.transformMode);
   const setTransformMode = useWarehouseStore((s) => s.setTransformMode);
   const selectedItems = useWarehouseStore((s) => s.selectedItems);
@@ -28,6 +29,8 @@ export function Toolbar() {
   const applySize = () => setWarehouseSize(Number(w) || 0, Number(d) || 0);
 
   if (appMode !== 'edit') return null;
+  // Auto-collapse: free the canvas while a focused workflow is active.
+  if (inspectingShelf || relocatingBoxId) return null;
 
   const onlyItem = selectedItems.length === 1 ? selectedItems[0] : null;
   const showTransformModes =
@@ -82,15 +85,9 @@ export function Toolbar() {
         </button>
         <button
           onClick={addWall}
-          className="rounded-md border border-slate-700/70 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 transition hover:bg-slate-700/70"
+          className="col-span-2 rounded-md border border-slate-700/70 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 transition hover:bg-slate-700/70"
         >
-          + Divisória
-        </button>
-        <button
-          onClick={addDoor}
-          className="rounded-md border border-slate-700/70 bg-slate-800/60 px-3 py-2 text-xs text-slate-100 transition hover:bg-slate-700/70"
-        >
-          + Porta
+          + Divisória <span className="text-slate-500">(portas entram pela parede)</span>
         </button>
         <FurnitureButton label="+ Mesa" onClick={() => addFurniture('desk')} />
         <FurnitureButton label="+ Cadeira" onClick={() => addFurniture('chair')} />
