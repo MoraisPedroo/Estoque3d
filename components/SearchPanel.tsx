@@ -7,6 +7,7 @@ import { MODEL_COLORS, MODEL_LABELS } from '@/lib/data';
 const MAX_RESULTS = 8;
 
 export function SearchPanel() {
+  const appMode = useWarehouseStore((s) => s.appMode);
   const boxes = useWarehouseStore((s) => s.boxes);
   const shelves = useWarehouseStore((s) => s.shelves);
   const searchSelectedBoxId = useWarehouseStore((s) => s.searchSelectedBoxId);
@@ -30,6 +31,8 @@ export function SearchPanel() {
       .slice(0, MAX_RESULTS);
   }, [boxes, query]);
 
+  if (appMode === 'walk') return null;
+
   const selectedBox = searchSelectedBoxId
     ? boxes.find((b) => b.id === searchSelectedBoxId)
     : null;
@@ -38,7 +41,7 @@ export function SearchPanel() {
     : null;
 
   return (
-    <div className="pointer-events-auto absolute bottom-5 left-1/2 z-10 w-[340px] -translate-x-1/2">
+    <div className="pointer-events-auto absolute left-5 top-5 z-10 w-[300px]">
       <div className="glass rounded-2xl p-4">
         <div className="flex items-center justify-between">
           <div className="text-xs uppercase tracking-[0.18em] text-slate-400">

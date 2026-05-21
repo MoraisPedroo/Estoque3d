@@ -2,6 +2,13 @@
 
 import { useWarehouseStore } from '@/store/useWarehouseStore';
 import { MODEL_COLORS, MODEL_LABELS, PrinterModel } from '@/lib/data';
+import type { AppMode } from '@/store/useWarehouseStore';
+
+const MODE_ITEMS: Array<{ id: AppMode; label: string; icon: string }> = [
+  { id: 'view', label: 'Visualizar', icon: '👁' },
+  { id: 'edit', label: 'Editar', icon: '✎' },
+  { id: 'walk', label: 'Caminhar', icon: '🚶' },
+];
 
 export function TopBar() {
   const view = useWarehouseStore((s) => s.view);
@@ -12,22 +19,12 @@ export function TopBar() {
   const backToFloor = useWarehouseStore((s) => s.backToFloor);
 
   const shelf = shelves.find((sh) => sh.id === selectedShelfId);
-  const isEdit = appMode === 'edit';
+
+  // In walk mode, hide the whole top bar (a separate WalkOverlay handles the hint).
+  if (appMode === 'walk') return null;
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between p-5">
-      <div className="glass pointer-events-auto rounded-2xl px-5 py-3">
-        <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Gêmeo Digital</div>
-        <div className="text-lg font-semibold text-slate-100">Estoque de Impressoras</div>
-        <div className="mt-1 text-xs text-slate-400">
-          {view === 'floor'
-            ? 'Clique para selecionar • duplo-clique numa estante para o zoom 3D'
-            : shelf
-            ? `Estante ${shelf.label} — clique numa caixa ou no painel para destacar fileiras`
-            : ''}
-        </div>
-      </div>
-
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-center p-5">
       <div className="glass pointer-events-auto flex flex-col gap-2 rounded-2xl px-4 py-3">
         <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Legenda</div>
         <div className="flex flex-wrap gap-x-3 gap-y-1.5">
@@ -45,24 +42,40 @@ export function TopBar() {
         </div>
       </div>
 
-      <div className="pointer-events-auto flex flex-col items-end gap-2">
-        <button
-          onClick={() => setAppMode(isEdit ? 'view' : 'edit')}
-          className={`glass rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
-            isEdit
-              ? 'bg-amber-500/20 text-amber-200 hover:bg-amber-500/30'
-              : 'bg-sky-500/20 text-sky-100 hover:bg-sky-500/30'
-          }`}
-        >
-          {isEdit ? '✕ Sair da edição' : '✎ Editar mapa'}
-        </button>
+      <div className="pointer-events-auto absolute right-5 top-5 flex flex-col items-end gap-2">
+        {/* Segmented mode switcher */}
+        <div className="glass flex items-center gap-1 rounded-2xl p-1">
+          {MODE_ITEMS.map((m) => {
+            const active = appMode === m.id;
+            return (
+              <button
+                key={m.id}
+                onClick={() => setAppMode(m.id)}
+                className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition ${
+                  active
+                    ? 'bg-sky-500 text-white shadow-md shadow-sky-500/30'
+                    : 'text-slate-300 hover:bg-slate-800/60'
+                }`}
+                title={m.label}
+              >
+                <span>{m.icon}</span>
+                <span>{m.label}</span>
+              </button>
+            );
+          })}
+        </div>
         {view === 'rack' && (
           <button
             onClick={backToFloor}
-            className="glass rounded-2xl px-4 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-slate-800/70"
+            className="glass rounded-2xl px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-800/70"
           >
             ← Voltar à planta
           </button>
+        )}
+        {shelf && view === 'rack' && (
+          <div className="glass rounded-2xl px-4 py-2 text-xs text-slate-300">
+            Estante <span className="font-semibold text-slate-100">{shelf.label}</span>
+          </div>
         )}
       </div>
     </div>

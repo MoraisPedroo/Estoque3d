@@ -10,6 +10,8 @@ import { DragBanner } from '@/components/DragBanner';
 import { RelocateBanner } from '@/components/RelocateBanner';
 import { ShelfGridModal } from '@/components/ShelfGridModal';
 import { SearchPanel } from '@/components/SearchPanel';
+import { WalkOverlay } from '@/components/WalkOverlay';
+import { FirebaseSync } from '@/components/FirebaseSync';
 
 const Scene = dynamic(() => import('@/components/Scene').then((m) => m.Scene), {
   ssr: false,
@@ -39,6 +41,8 @@ export default function Page() {
         <RelocateBanner />
         <BoxDetailsModal />
         <ShelfGridModal />
+        <WalkOverlay />
+        <FirebaseSync />
       </div>
     </main>
   );

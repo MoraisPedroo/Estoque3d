@@ -17,6 +17,8 @@ export interface Shelf {
   depthLayers: number; // 1 | 2 | 3
   capacityPerLayer: number; // = rows * columns
   boxSize: [number, number, number];
+  /** True for double-tier shelves: adds a thicker mid-ceiling between the two tiers. */
+  hasMidCeiling: boolean;
 }
 
 export interface Box {
@@ -146,6 +148,7 @@ export function defaultShelves(): Shelf[] {
     depthLayers,
     capacityPerLayer: rows * columns,
     boxSize: [...DEFAULT_BOX_SIZE] as [number, number, number],
+    hasMidCeiling: false,
   });
 
   return [

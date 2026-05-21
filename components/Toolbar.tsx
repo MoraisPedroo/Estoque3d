@@ -15,6 +15,7 @@ export function Toolbar() {
   const warehouseSize = useWarehouseStore((s) => s.warehouseSize);
   const setWarehouseSize = useWarehouseStore((s) => s.setWarehouseSize);
   const addShelf = useWarehouseStore((s) => s.addShelf);
+  const addDoubleShelf = useWarehouseStore((s) => s.addDoubleShelf);
   const addWall = useWarehouseStore((s) => s.addWall);
   const addFurniture = useWarehouseStore((s) => s.addFurniture);
   const inspectingShelf = useWarehouseStore((s) => s.inspectingShelf);
@@ -40,7 +41,7 @@ export function Toolbar() {
       onlyItem.type === 'shelf');
 
   return (
-    <div className="glass side-panel pointer-events-auto absolute left-5 top-28 z-10 w-[260px] rounded-2xl p-4">
+    <div className="glass side-panel pointer-events-auto absolute left-5 top-44 z-10 w-[260px] rounded-2xl p-4">
       <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Dimensões do Galpão</div>
       <div className="mt-2 grid grid-cols-2 gap-2">
         <label className="text-[11px] text-slate-400">
@@ -79,9 +80,16 @@ export function Toolbar() {
       <div className="mt-2 grid grid-cols-2 gap-2">
         <button
           onClick={addShelf}
-          className="col-span-2 rounded-md border border-sky-500/40 bg-sky-500/15 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/25"
+          className="rounded-md border border-sky-500/40 bg-sky-500/15 px-3 py-2 text-xs text-sky-200 transition hover:bg-sky-500/25"
         >
           + Estante
+        </button>
+        <button
+          onClick={addDoubleShelf}
+          className="rounded-md border border-violet-500/40 bg-violet-500/15 px-3 py-2 text-xs text-violet-200 transition hover:bg-violet-500/25"
+          title="Estante de 2 módulos com teto no meio"
+        >
+          + Estante Dupla
         </button>
         <button
           onClick={addWall}

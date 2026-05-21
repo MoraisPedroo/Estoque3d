@@ -11,6 +11,7 @@ import { Furniture } from './Furniture';
 import { Doors } from './Doors';
 import { BoxDragProxy } from './BoxDragProxy';
 import { RouteLine } from './RouteLine';
+import { WalkMode } from './WalkMode';
 import { useWarehouseStore } from '@/store/useWarehouseStore';
 import { cameraRef } from '@/lib/cameraRef';
 
@@ -18,6 +19,7 @@ function CameraDirector() {
   const localRef = useRef<CameraControlsImpl | null>(null);
 
   const view = useWarehouseStore((s) => s.view);
+  const appMode = useWarehouseStore((s) => s.appMode);
   const selectedShelfId = useWarehouseStore((s) => s.selectedShelfId);
   const shelves = useWarehouseStore((s) => s.shelves);
   const warehouseSize = useWarehouseStore((s) => s.warehouseSize);
@@ -25,6 +27,7 @@ function CameraDirector() {
   useEffect(() => {
     const controls = localRef.current;
     if (!controls) return;
+    if (appMode === 'walk') return; // walk mode owns the camera
     cameraRef.current = controls;
 
     if (view === 'floor' || !selectedShelfId) {
@@ -56,7 +59,9 @@ function CameraDirector() {
       sz,
       true
     );
-  }, [view, selectedShelfId, shelves, warehouseSize]);
+  }, [view, selectedShelfId, shelves, warehouseSize, appMode]);
+
+  if (appMode === 'walk') return null;
 
   return (
     <CameraControls
@@ -220,6 +225,7 @@ export function Scene() {
       <ContactShadows position={[0, 0.01, 0]} opacity={0.55} scale={80} blur={2.2} far={8} />
 
       <CameraDirector />
+      <WalkMode />
     </Canvas>
   );
 }

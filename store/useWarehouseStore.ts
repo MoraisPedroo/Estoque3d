@@ -19,7 +19,7 @@ import {
 import { snapDoorToWall } from '@/lib/snap';
 
 export type ViewMode = 'floor' | 'rack';
-export type AppMode = 'view' | 'edit';
+export type AppMode = 'view' | 'edit' | 'walk';
 
 interface WarehouseState {
   appMode: AppMode;
@@ -68,6 +68,7 @@ interface WarehouseState {
   updateFurniture: (id: string, patch: Partial<Furniture>) => void;
 
   addShelf: () => void;
+  addDoubleShelf: () => void;
   addWall: () => void;
   addFurniture: (type: FurnitureType) => void;
   addDoorToWall: (wallId: string, fraction?: number) => void;
@@ -93,6 +94,15 @@ interface WarehouseState {
 
   startDraggingSelected: () => void;
   stopDragging: () => void;
+
+  loadFromSnapshot: (snap: {
+    warehouseSize: { width: number; depth: number };
+    shelves: Shelf[];
+    boxes: Box[];
+    walls: Wall[];
+    furniture: Furniture[];
+    doors: Door[];
+  }) => void;
 }
 
 const initialShelves = defaultShelves();
@@ -253,6 +263,33 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
         depthLayers: 1,
         capacityPerLayer: 3 * 6,
         boxSize: [0.9, 0.55, 0.7],
+        hasMidCeiling: false,
+      };
+      const shelves = [...s.shelves, newShelf];
+      const fresh = generateBoxesForShelf(newShelf, shelves.length - 1);
+      return {
+        shelves,
+        boxes: [...s.boxes, ...fresh],
+        selectedItems: [{ id, type: 'shelf' }],
+      };
+    });
+  },
+
+  addDoubleShelf: () => {
+    const id = uid('shelf');
+    set((s) => {
+      // 6 fileiras = 2 módulos × 3 fileiras cada, com teto no meio.
+      const newShelf: Shelf = {
+        id,
+        label: `D${s.shelves.length + 1}`,
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        rows: 6,
+        columns: 6,
+        depthLayers: 1,
+        capacityPerLayer: 6 * 6,
+        boxSize: [0.9, 0.55, 0.7],
+        hasMidCeiling: true,
       };
       const shelves = [...s.shelves, newShelf];
       const fresh = generateBoxesForShelf(newShelf, shelves.length - 1);
@@ -351,12 +388,26 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
       const door = s.doors.find((d) => d.id === id);
       if (!door) return s;
       const merged: Door = { ...door, ...patch };
+
+      // A porta nunca pode ser maior do que a parede em que está pendurada.
+      if (merged.wallId) {
+        const wall = s.walls.find((w) => w.id === merged.wallId);
+        if (wall) {
+          const maxW = Math.max(0.4, wall.scale[0] - 0.1);
+          const maxH = Math.max(0.8, wall.scale[1] - 0.05);
+          merged.scale = [
+            Math.min(merged.scale[0], maxW),
+            Math.min(merged.scale[1], maxH),
+            merged.scale[2],
+          ];
+        }
+      }
+
       const snapped =
         patch.position || patch.rotation || patch.scale
           ? snapDoorToWall(merged, s.walls)
           : merged;
       let doors = s.doors.map((d) => (d.id === id ? snapped : d));
-      // If isPrincipal got promoted, demote all other doors.
       if (patch.isPrincipal === true) {
         doors = doors.map((d) => (d.id === id ? d : { ...d, isPrincipal: false }));
       }
@@ -549,4 +600,25 @@ export const useWarehouseStore = create<WarehouseState>((set, get) => ({
   },
 
   stopDragging: () => set({ draggingBoxIds: [] }),
+
+  loadFromSnapshot: (snap) =>
+    set({
+      warehouseSize: snap.warehouseSize,
+      shelves: snap.shelves,
+      boxes: snap.boxes,
+      walls: snap.walls,
+      furniture: snap.furniture,
+      doors: snap.doors,
+      // Reset transient state so the loaded layout opens clean.
+      selectedItems: [],
+      hoveredBoxId: null,
+      view: 'floor',
+      selectedShelfId: null,
+      selectedRow: null,
+      searchSelectedBoxId: null,
+      routeAlert: null,
+      inspectingShelf: null,
+      relocatingBoxId: null,
+      draggingBoxIds: [],
+    }),
 }));

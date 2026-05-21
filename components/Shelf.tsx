@@ -285,6 +285,7 @@ export function Shelf({ shelf }: { shelf: ShelfType }) {
             boxHeight={shelf.boxSize[1]}
             highlighted={isShelfSelected || isFocused}
             dim={dimAmount}
+            hasMidCeiling={shelf.hasMidCeiling}
           />
         </group>
 
@@ -377,6 +378,7 @@ function RackFrame({
   boxHeight,
   highlighted,
   dim,
+  hasMidCeiling,
 }: {
   width: number;
   height: number;
@@ -385,9 +387,11 @@ function RackFrame({
   boxHeight: number;
   highlighted: boolean;
   dim: number;
+  hasMidCeiling: boolean;
 }) {
   const useDim = dim > 0;
   const dimOpacity = 1 - dim;
+  const midRow = Math.floor(rows / 2); // tier separator row
   const t = RACK_FRAME_THICKNESS;
   const shelfThickness = 0.03;
 
@@ -396,13 +400,32 @@ function RackFrame({
   const shelves = [];
   for (let r = 0; r < rows; r++) {
     const y = r * (boxHeight + 0.05) + 0.025;
+    const isMidCeiling = hasMidCeiling && r === midRow;
+    const thickness = isMidCeiling ? shelfThickness * 4 : shelfThickness;
     shelves.push(
       <mesh key={`shelf-${r}`} position={[0, y, 0]} castShadow receiveShadow>
-        <boxGeometry args={[width, shelfThickness, depth]} />
+        <boxGeometry args={[width, thickness, depth]} />
         <meshStandardMaterial
-          color={highlighted ? '#334155' : '#1f2937'}
+          color={isMidCeiling ? '#0b1220' : highlighted ? '#334155' : '#1f2937'}
           roughness={0.7}
-          metalness={0.4}
+          metalness={isMidCeiling ? 0.55 : 0.4}
+          transparent={useDim}
+          opacity={useDim ? dimOpacity : 1}
+        />
+      </mesh>
+    );
+  }
+  // Closed top cap when the shelf is a double-tier (so the upper module
+  // actually has a real "ceiling" closing the lower one from above).
+  if (hasMidCeiling) {
+    const yTop = rows * (boxHeight + 0.05) + 0.025;
+    shelves.push(
+      <mesh key="shelf-top-cap" position={[0, yTop, 0]} castShadow receiveShadow>
+        <boxGeometry args={[width, shelfThickness * 3, depth]} />
+        <meshStandardMaterial
+          color="#0b1220"
+          roughness={0.7}
+          metalness={0.55}
           transparent={useDim}
           opacity={useDim ? dimOpacity : 1}
         />

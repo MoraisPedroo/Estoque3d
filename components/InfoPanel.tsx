@@ -4,11 +4,14 @@ import { useWarehouseStore } from '@/store/useWarehouseStore';
 
 export function InfoPanel() {
   const view = useWarehouseStore((s) => s.view);
+  const appMode = useWarehouseStore((s) => s.appMode);
   const shelves = useWarehouseStore((s) => s.shelves);
   const boxes = useWarehouseStore((s) => s.boxes);
   const selectedShelfId = useWarehouseStore((s) => s.selectedShelfId);
   const selectedRow = useWarehouseStore((s) => s.selectedRow);
   const selectRow = useWarehouseStore((s) => s.selectRow);
+
+  if (appMode === 'walk') return null;
 
   if (view === 'floor') {
     const filled = boxes.filter((b) => b.model !== 'vazio').length;
