@@ -38,7 +38,7 @@ export function SearchPanel() {
     : null;
 
   return (
-    <div className="pointer-events-auto absolute right-5 bottom-5 z-10 w-[320px]">
+    <div className="pointer-events-auto absolute bottom-5 left-1/2 z-10 w-[340px] -translate-x-1/2">
       <div className="glass rounded-2xl p-4">
         <div className="flex items-center justify-between">
           <div className="text-xs uppercase tracking-[0.18em] text-slate-400">

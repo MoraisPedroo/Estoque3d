@@ -546,15 +546,24 @@ function WallInspector({ id }: { id: string }) {
     <div className="mt-2 space-y-3">
       <div className="text-base font-semibold text-slate-100">Divisória</div>
 
-      <label className="block text-[11px] text-slate-400">
-        Cor
-        <input
-          type="color"
-          value={wall.color}
-          onChange={(e) => updateWall(wall.id, { color: e.target.value })}
-          className="mt-1 h-8 w-14 cursor-pointer rounded border border-slate-700 bg-transparent"
-        />
-      </label>
+      <div className="flex items-end gap-2">
+        <label className="block text-[11px] text-slate-400">
+          Cor
+          <input
+            type="color"
+            value={wall.color}
+            onChange={(e) => updateWall(wall.id, { color: e.target.value })}
+            className="mt-1 h-8 w-14 cursor-pointer rounded border border-slate-700 bg-transparent"
+          />
+        </label>
+        <button
+          onClick={() => addDoorToWall(wall.id, 0.5)}
+          className="ml-auto h-8 rounded-md bg-sky-500 px-3 text-xs font-medium text-white transition hover:bg-sky-400"
+          title="Inserir uma porta com vão CSG nesta parede"
+        >
+          + Adicionar Porta
+        </button>
+      </div>
 
       <div>
         <div className="mb-1 text-[11px] uppercase text-slate-500">Dimensões (m)</div>
@@ -598,20 +607,12 @@ function WallInspector({ id }: { id: string }) {
 
       {/* Doors are now a property of the wall (CSG-cut, slider-positioned). */}
       <div className="rounded-xl border border-slate-700/50 bg-slate-900/40 p-3">
-        <div className="flex items-center justify-between">
-          <div className="text-[11px] uppercase tracking-wider text-slate-400">
-            Portas nesta parede
-          </div>
-          <button
-            onClick={() => addDoorToWall(wall.id, 0.5)}
-            className="rounded-md bg-sky-500 px-2.5 py-1 text-[11px] font-medium text-white transition hover:bg-sky-400"
-          >
-            + Adicionar Porta
-          </button>
+        <div className="text-[11px] uppercase tracking-wider text-slate-400">
+          Portas nesta parede
         </div>
         {wallDoors.length === 0 ? (
           <p className="mt-2 text-[11px] text-slate-500">
-            Nenhuma porta. O CSG vai abrir um vão real na parede assim que você adicionar.
+            Nenhuma. Use o botão <span className="text-slate-300">+ Adicionar Porta</span> acima para abrir um vão CSG real na parede.
           </p>
         ) : (
           <ul className="mt-2 space-y-2.5">
